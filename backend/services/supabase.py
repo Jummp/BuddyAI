@@ -43,7 +43,7 @@ async def get_today_session() -> Optional[dict]:
 
 
 async def upsert_session(session_id: Optional[str], messages: list[dict]) -> str:
-    now = datetime.datetime.utcnow().isoformat()
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     if session_id:
         await asyncio.to_thread(
             lambda: supabase.table("sessions")

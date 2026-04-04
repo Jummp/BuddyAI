@@ -26,3 +26,19 @@ async def test_get_today_session_returns_none_when_empty(mock_supabase):
     from backend.services.supabase import get_today_session
     result = await get_today_session()
     assert result is None
+
+async def test_upsert_session_inserts_when_no_session_id(mock_supabase):
+    mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [
+        {"id": "new-session-uuid"}
+    ]
+    from backend.services.supabase import upsert_session
+    result = await upsert_session(None, [{"role": "user", "content": "ciao"}])
+    assert result == "new-session-uuid"
+    mock_supabase.table.return_value.insert.assert_called_once()
+
+async def test_upsert_session_updates_when_session_id_exists(mock_supabase):
+    mock_supabase.table.return_value.update.return_value.eq.return_value.execute = MagicMock()
+    from backend.services.supabase import upsert_session
+    result = await upsert_session("existing-id", [{"role": "user", "content": "ciao"}])
+    assert result == "existing-id"
+    mock_supabase.table.return_value.update.assert_called_once()
