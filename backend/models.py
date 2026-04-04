@@ -1,24 +1,27 @@
 from pydantic import BaseModel
-from typing import List, Optional
 from datetime import datetime
+
 
 class ChatRequest(BaseModel):
     text: str
 
+
 class IntentResult(BaseModel):
-    intent: List[str]
+    intent: list[str]
     tone: str
 
+
 class MemoryEntities(BaseModel):
-    events: List[str] = []
-    people: List[str] = []
-    emotions: List[str] = []
-    topics: List[str] = []
+    events: list[str] = []
+    people: list[str] = []
+    emotions: list[str] = []
+    topics: list[str] = []
+
 
 class MemoryRecord(BaseModel):
     id: str
     date: datetime
     raw_text: str
-    summary: Optional[str]
+    summary: str | None = None
     entities: MemoryEntities
     created_at: datetime
