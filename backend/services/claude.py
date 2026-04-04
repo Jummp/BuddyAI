@@ -25,12 +25,12 @@ Tone disponibili:
 - motivational: l'utente ha bisogno di motivazione o ha fatto qualcosa di positivo
 - supportive: l'utente esprime difficoltà o emozioni negative
 
-Messaggio: {text}"""
+Messaggio:"""
 
 _MEMORY_PROMPT = """Analizza il testo e restituisci SOLO un JSON valido:
 {{"summary": "riassunto in 1-2 frasi", "entities": {{"events": [], "people": [], "emotions": [], "topics": []}}}}
 
-Testo: {text}"""
+Testo:"""
 
 _SYSTEM_PROMPTS = {
     "neutral": "Sei BuddyAI, un companion personale. Rispondi in modo chiaro e utile in italiano.",
@@ -43,7 +43,7 @@ async def classify_intent(text: str) -> IntentResult:
     response = await client.messages.create(
         model=HAIKU_MODEL,
         max_tokens=256,
-        messages=[{"role": "user", "content": _INTENT_PROMPT.format(text=text)}],
+        messages=[{"role": "user", "content": f"{_INTENT_PROMPT}\n{text}"}],
     )
     raw = response.content[0].text.strip()
     try:
@@ -73,7 +73,7 @@ async def summarize_and_extract(text: str) -> tuple[str, dict]:
     response = await client.messages.create(
         model=HAIKU_MODEL,
         max_tokens=512,
-        messages=[{"role": "user", "content": _MEMORY_PROMPT.format(text=text)}],
+        messages=[{"role": "user", "content": f"{_MEMORY_PROMPT}\n{text}"}],
     )
     raw = response.content[0].text.strip()
     try:
