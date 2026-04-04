@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import AsyncGenerator
+from typing import AsyncIterator
 from backend.models import IntentResult
 from backend.services.claude import (
     classify_intent,
@@ -18,7 +18,7 @@ def select_model(intent: list[str]) -> str:
     return HAIKU_MODEL
 
 
-async def process(text: str) -> AsyncGenerator[str, None]:
+async def process(text: str) -> AsyncIterator[str]:
     # Lazy import to avoid ModuleNotFoundError when memory agent doesn't exist yet
     from backend.agents.memory import process as memory_process  # noqa: PLC0415
 
@@ -32,7 +32,7 @@ async def process(text: str) -> AsyncGenerator[str, None]:
     history: list[dict] = session["messages"] if session else []
 
     # 3. Save memory in background (does not block streaming)
-    asyncio.create_task(memory_process(text))
+    _bg_task = asyncio.create_task(memory_process(text))  # noqa: F841 — keep ref to prevent GC
 
     # 4. Build message history with new message (max 20)
     messages = (history + [{"role": "user", "content": text}])[-20:]
