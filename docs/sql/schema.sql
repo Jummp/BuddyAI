@@ -84,3 +84,26 @@ CREATE TABLE IF NOT EXISTS nutrition_plan (
 );
 
 CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date ON nutrition_logs(date DESC);
+
+-- Definizioni habit e limit configurati dall'utente
+CREATE TABLE IF NOT EXISTS habit_definitions (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT NOT NULL UNIQUE,
+  habit_type TEXT NOT NULL DEFAULT 'habit',  -- 'habit' | 'limit'
+  unit       TEXT NOT NULL DEFAULT '',
+  target     FLOAT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Log giornaliero di ogni entry
+CREATE TABLE IF NOT EXISTS habit_logs (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  habit_id    UUID NOT NULL REFERENCES habit_definitions(id) ON DELETE CASCADE,
+  date        DATE NOT NULL DEFAULT CURRENT_DATE,
+  value       FLOAT NOT NULL DEFAULT 0,
+  description TEXT NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(date DESC);
+CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_id ON habit_logs(habit_id);
