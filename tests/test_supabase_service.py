@@ -117,6 +117,7 @@ async def test_save_nutrition_plan_calls_upsert(mock_supabase):
         source="generated",
     )
     mock_supabase.table.return_value.upsert.assert_called_once()
+    mock_supabase.table.return_value.delete.assert_called_once()
 
 
 async def test_upsert_nutrition_targets_merges_targets(mock_supabase):

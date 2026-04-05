@@ -113,8 +113,7 @@ async def save_nutrition_log(date: str, meal_description: str, nutrients: dict) 
 
 async def get_weekly_nutrition(week_start: str) -> list[dict]:
     """Restituisce tutti i log dalla data week_start (ISO) a +6 giorni."""
-    import datetime as dt
-    week_end = (dt.date.fromisoformat(week_start) + dt.timedelta(days=6)).isoformat()
+    week_end = (datetime.date.fromisoformat(week_start) + datetime.timedelta(days=6)).isoformat()
     result = await asyncio.to_thread(
         lambda: supabase.table("nutrition_logs")
             .select("*")
@@ -146,7 +145,9 @@ async def save_nutrition_plan(
     notes: str,
     source: str,
 ) -> None:
-    """Salva (upsert) il piano nutrizionale. Sovrascrive il record esistente."""
+    """Salva il piano nutrizionale. Delete + insert (non atomico).
+NOTE: un crash tra delete e insert lascia la tabella vuota fino alla prossima chiamata.
+"""
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     await asyncio.to_thread(
         lambda: supabase.table("nutrition_plan").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
