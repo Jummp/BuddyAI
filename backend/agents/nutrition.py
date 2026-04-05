@@ -144,7 +144,7 @@ async def generate_plan(objectives: str) -> str:
   "diet_type": "omnivore|vegetarian|vegan|other",
   "allergies": [],
   "targets": {{"calories_kcal": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0, "fiber_g": 0, "sugar_g": 0, "sodium_mg": 0, "cholesterol_mg": 0, "iron_mg": 0, "vitamin_b12_ug": 0, "vitamin_d_ug": 0, "vitamin_c_mg": 0, "calcium_mg": 0}},
-  "foods": {{"iron": [], "vitamin_b12": [], "vitamin_d": []}},
+  "foods": {{"iron": [], "vitamin_b12": [], "vitamin_d": [], "vitamin_c": []}},
   "notes": ""
 }}
 

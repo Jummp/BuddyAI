@@ -108,3 +108,27 @@ async def test_get_weekly_summary_empty_week(mock_nutrition_deps):
     from backend.agents.nutrition import get_weekly_summary
     result = await get_weekly_summary("2026-03-30")
     assert "nessun" in result.lower() or "0" in result
+
+
+async def test_generate_plan_saves_plan(mock_nutrition_deps):
+    mock_plan, _, _, _ = mock_nutrition_deps
+    with patch("anthropic.AsyncAnthropic") as mock_async_anthropic, \
+         patch("backend.config.get_settings") as mock_settings, \
+         patch("backend.services.supabase.save_nutrition_plan") as mock_save_plan:
+        mock_settings.return_value.anthropic_api_key = "test-key"
+        mock_client = AsyncMock()
+        mock_async_anthropic.return_value = mock_client
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text='{"diet_type": "vegetarian", "allergies": ["latticini"], "targets": {"calories_kcal": 2000, "protein_g": 120, "carbs_g": 250, "fat_g": 65, "fiber_g": 30, "sugar_g": 45, "sodium_mg": 2000, "cholesterol_mg": 280, "iron_mg": 20, "vitamin_b12_ug": 2.4, "vitamin_d_ug": 15, "vitamin_c_mg": 90, "calcium_mg": 1000}, "foods": {"iron": [{"food": "lenticchie", "qty": "150g"}], "vitamin_b12": [{"food": "uova", "qty": "2"}], "vitamin_d": [{"food": "salmone", "qty": "100g"}], "vitamin_c": [{"food": "peperoni", "qty": "100g"}]}, "notes": "piano test"}')]
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+        mock_save_plan.return_value = None
+
+        from backend.agents.nutrition import generate_plan
+        result = await generate_plan("2000kcal, vegetariano, no latticini, aumenta ferro")
+
+        mock_save_plan.assert_called_once()
+        call_kwargs = mock_save_plan.call_args.kwargs
+        assert call_kwargs["diet_type"] == "vegetarian"
+        assert call_kwargs["source"] == "generated"
+        assert isinstance(result, str)
+        assert "generato" in result.lower() or "salvato" in result.lower()
