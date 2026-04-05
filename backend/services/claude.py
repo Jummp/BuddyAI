@@ -20,6 +20,7 @@ Intent disponibili (seleziona tutti quelli applicabili):
 - log_task: l'utente menziona qualcosa da fare o un obiettivo
 - coaching_check: l'utente esprime stato emotivo, difficoltà, o deviazioni da abitudini
 - habit_update: l'utente aggiorna un habit (esercizio, lettura, ecc.)
+- training_request: l'utente vuole allenarsi, chiede cosa fare oggi, menziona un blocco specifico, o chiede del suo piano di allenamento
 
 Tone disponibili:
 - neutral: risposta informativa
@@ -63,8 +64,11 @@ async def stream_response(
     messages: list[dict],
     model: str,
     tone: str,
+    extra_system: str = "",
 ) -> AsyncGenerator[str, None]:
     system = _SYSTEM_PROMPTS.get(tone, _SYSTEM_PROMPTS["neutral"])
+    if extra_system:
+        system = f"{system}\n\n{extra_system}"
     async with client.messages.stream(
         model=model,
         max_tokens=1024,

@@ -17,3 +17,7 @@ def test_select_model_sonnet_for_coaching():
 def test_select_model_sonnet_for_many_intents():
     # More than 2 intents → complex reasoning → Sonnet
     assert select_model(["log_memory", "log_nutrition", "log_task"]) == SONNET_MODEL
+
+
+def test_select_model_sonnet_for_training_request():
+    assert select_model(["log_memory", "training_request"]) == SONNET_MODEL

@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 from typing import AsyncIterator
 from backend.models import IntentResult
@@ -13,7 +14,7 @@ from backend.services.supabase import get_today_session, upsert_session
 
 def select_model(intent: list[str]) -> str:
     """Select Claude model based on intents. Pure function."""
-    if "coaching_check" in intent or len(intent) > 2:
+    if "coaching_check" in intent or "training_request" in intent or len(intent) > 2:
         return SONNET_MODEL
     return HAIKU_MODEL
 
@@ -34,16 +35,23 @@ async def process(text: str) -> AsyncIterator[str]:
     # 3. Save memory in background (does not block streaming)
     _bg_task = asyncio.create_task(memory_process(text))  # noqa: F841 — keep ref to prevent GC
 
-    # 4. Build message history with new message (max 20)
+    # 4. Build training context if requested
+    extra_system = ""
+    if "training_request" in intent_result.intent:
+        from backend.agents.coaching import build_training_context, select_block  # noqa: PLC0415
+        block = select_block(text, datetime.date.today().month)
+        extra_system = await build_training_context(block)
+
+    # 5. Build message history with new message (max 20)
     messages = (history + [{"role": "user", "content": text}])[-20:]
 
-    # 5. Stream response token by token
+    # 6. Stream response token by token
     full_response = ""
-    async for token in stream_response(messages, model, intent_result.tone):
+    async for token in stream_response(messages, model, intent_result.tone, extra_system=extra_system):
         full_response += token
         yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
 
-    # 6. Update session with assistant response
+    # 7. Update session with assistant response
     updated_messages = (messages + [{"role": "assistant", "content": full_response}])[-20:]
     await upsert_session(session_id, updated_messages)
 
