@@ -59,3 +59,42 @@ async def upsert_session(session_id: Optional[str], messages: list[dict]) -> str
                 .execute()
         )
         return result.data[0]["id"]
+
+
+async def get_block_exercises(block: str) -> list[dict]:
+    """Restituisce tutti gli esercizi del blocco (A, B, o C) ordinati per drill_id."""
+    result = await asyncio.to_thread(
+        lambda: supabase.table("training_exercises")
+            .select("*")
+            .eq("block", block)
+            .order("drill_id")
+            .execute()
+    )
+    return result.data
+
+
+async def get_video_link(exercise_name: str) -> dict | None:
+    """Cerca in training_links un link per l'esercizio. Case-insensitive."""
+    result = await asyncio.to_thread(
+        lambda: supabase.table("training_links")
+            .select("exercise_name,url,title")
+            .ilike("exercise_name", exercise_name)
+            .limit(1)
+            .execute()
+    )
+    if not result.data:
+        return None
+    row = result.data[0]
+    return {"url": row["url"], "title": row["title"]}
+
+
+async def save_video_link(exercise_name: str, url: str, title: str, source: str) -> None:
+    """Salva un link video. Usa upsert per non duplicare."""
+    await asyncio.to_thread(
+        lambda: supabase.table("training_links")
+            .upsert(
+                {"exercise_name": exercise_name, "url": url, "title": title, "source": source},
+                on_conflict="exercise_name",
+            )
+            .execute()
+    )
