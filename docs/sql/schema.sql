@@ -60,3 +60,27 @@ CREATE TABLE IF NOT EXISTS training_links (
 
 CREATE INDEX IF NOT EXISTS idx_training_exercises_block ON training_exercises(block);
 CREATE INDEX IF NOT EXISTS idx_training_links_exercise ON training_links(exercise_name);
+
+-- Log giornaliero pasti
+CREATE TABLE IF NOT EXISTS nutrition_logs (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date             DATE NOT NULL DEFAULT CURRENT_DATE,
+  meal_description TEXT NOT NULL,
+  nutrients        JSONB NOT NULL DEFAULT '{}',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Piano nutrizionale personalizzato (unico record)
+CREATE TABLE IF NOT EXISTS nutrition_plan (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  diet_type    TEXT NOT NULL DEFAULT 'omnivore',
+  allergies    TEXT[] NOT NULL DEFAULT '{}',
+  targets      JSONB NOT NULL DEFAULT '{}',
+  foods        JSONB NOT NULL DEFAULT '{}',
+  notes        TEXT,
+  source       TEXT NOT NULL DEFAULT 'generated',
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_nutrition_logs_date ON nutrition_logs(date DESC);
