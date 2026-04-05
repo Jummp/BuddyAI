@@ -1,11 +1,5 @@
 import json
-import re
-import anthropic
-from backend.config import get_settings
-
-client = anthropic.AsyncAnthropic(api_key=get_settings().anthropic_api_key)
-
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
+from backend.services.claude import client, HAIKU_MODEL, _strip_markdown
 
 _NUTRIENT_KEYS = [
     "calories_kcal", "protein_g", "carbs_g", "fat_g", "fiber_g",
@@ -20,10 +14,6 @@ Restituisci SOLO JSON valido con esattamente questi campi (usa 0 se non stimabil
 calories_kcal, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg, iron_mg, vitamin_b12_ug, vitamin_d_ug, vitamin_c_mg, calcium_mg
 
 Pasto: {meal_description}"""
-
-
-def _strip_markdown(text: str) -> str:
-    return re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.MULTILINE).strip()
 
 
 async def estimate_nutrients(meal_description: str, diet_type: str, allergies: list[str]) -> dict:
