@@ -33,3 +33,30 @@ CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC);
 
 -- Index per recuperare memorie in ordine cronologico
 CREATE INDEX IF NOT EXISTS idx_memories_date ON memories(date DESC);
+
+-- Esercizi dal piano di allenamento (popolato da load_training.py)
+CREATE TABLE IF NOT EXISTS training_exercises (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  block         CHAR(1) NOT NULL,
+  drill_id      TEXT,
+  exercise_name TEXT NOT NULL,
+  sets          TEXT,
+  reps          TEXT,
+  rest          TEXT,
+  month_focus   TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(block, exercise_name)
+);
+
+-- Link video per esercizio (cache YouTube + link manuali)
+CREATE TABLE IF NOT EXISTS training_links (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  exercise_name TEXT NOT NULL UNIQUE,
+  url           TEXT NOT NULL,
+  title         TEXT,
+  source        TEXT NOT NULL DEFAULT 'youtube',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_training_exercises_block ON training_exercises(block);
+CREATE INDEX IF NOT EXISTS idx_training_links_exercise ON training_links(exercise_name);
