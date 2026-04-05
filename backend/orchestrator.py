@@ -42,6 +42,12 @@ async def process(text: str) -> AsyncIterator[str]:
         block = select_block(text, datetime.date.today().month)
         extra_system = await build_training_context(block)
 
+    # 4b. Build nutrition context if requested (and not also a training request)
+    if "log_nutrition" in intent_result.intent and "training_request" not in intent_result.intent:
+        from backend.agents.nutrition import log_meal  # noqa: PLC0415
+        extra_system = await log_meal(text)
+        intent_result = IntentResult(intent=intent_result.intent, tone="nutrition")
+
     # 5. Build message history with new message (max 20)
     messages = (history + [{"role": "user", "content": text}])[-20:]
 
