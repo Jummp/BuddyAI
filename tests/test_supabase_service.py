@@ -77,3 +77,54 @@ async def test_save_video_link_calls_upsert(mock_supabase):
     await save_video_link("Romanian Deadlift KB", "https://youtube.com/watch?v=abc", "KB RDL Tutorial", "youtube")
     mock_supabase.table.assert_called_with("training_links")
     mock_supabase.table.return_value.upsert.assert_called_once()
+
+
+async def test_save_nutrition_log_calls_insert(mock_supabase):
+    mock_supabase.table.return_value.insert.return_value.execute = MagicMock()
+    from backend.services.supabase import save_nutrition_log
+    await save_nutrition_log("2026-04-05", "pollo e riso", {"calories_kcal": 480})
+    mock_supabase.table.assert_called_with("nutrition_logs")
+    mock_supabase.table.return_value.insert.assert_called_once()
+
+
+async def test_get_weekly_nutrition_returns_list(mock_supabase):
+    mock_supabase.table.return_value.select.return_value.gte.return_value.lte.return_value.order.return_value.execute.return_value.data = [
+        {"id": "uuid-1", "date": "2026-04-05", "meal_description": "pollo", "nutrients": {"calories_kcal": 480}}
+    ]
+    from backend.services.supabase import get_weekly_nutrition
+    result = await get_weekly_nutrition("2026-03-30")
+    assert isinstance(result, list)
+    assert result[0]["date"] == "2026-04-05"
+
+
+async def test_get_nutrition_plan_returns_none_when_empty(mock_supabase):
+    mock_supabase.table.return_value.select.return_value.order.return_value.limit.return_value.execute.return_value.data = []
+    from backend.services.supabase import get_nutrition_plan
+    result = await get_nutrition_plan()
+    assert result is None
+
+
+async def test_save_nutrition_plan_calls_upsert(mock_supabase):
+    mock_supabase.table.return_value.delete.return_value.neq.return_value.execute = MagicMock()
+    mock_supabase.table.return_value.upsert.return_value.execute = MagicMock()
+    from backend.services.supabase import save_nutrition_plan
+    await save_nutrition_plan(
+        diet_type="vegetarian",
+        allergies=["latticini"],
+        targets={"calories_kcal": 2200, "iron_mg": 18},
+        foods={"iron": [{"food": "spinaci", "qty": "200g"}]},
+        notes="test",
+        source="generated",
+    )
+    mock_supabase.table.return_value.upsert.assert_called_once()
+
+
+async def test_upsert_nutrition_targets_merges_targets(mock_supabase):
+    # Simulate existing plan with some targets
+    mock_supabase.table.return_value.select.return_value.order.return_value.limit.return_value.execute.return_value.data = [
+        {"id": "plan-uuid", "targets": {"calories_kcal": 2000, "protein_g": 100}}
+    ]
+    mock_supabase.table.return_value.update.return_value.eq.return_value.execute = MagicMock()
+    from backend.services.supabase import upsert_nutrition_targets
+    await upsert_nutrition_targets({"iron_mg": 18, "protein_g": 150})
+    mock_supabase.table.return_value.update.assert_called_once()

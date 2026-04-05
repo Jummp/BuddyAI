@@ -98,3 +98,82 @@ async def save_video_link(exercise_name: str, url: str, title: str, source: str)
             )
             .execute()
     )
+
+
+async def save_nutrition_log(date: str, meal_description: str, nutrients: dict) -> None:
+    """Salva un log pasto per la data specificata (formato ISO: '2026-04-05')."""
+    await asyncio.to_thread(
+        lambda: supabase.table("nutrition_logs").insert({
+            "date": date,
+            "meal_description": meal_description,
+            "nutrients": nutrients,
+        }).execute()
+    )
+
+
+async def get_weekly_nutrition(week_start: str) -> list[dict]:
+    """Restituisce tutti i log dalla data week_start (ISO) a +6 giorni."""
+    import datetime as dt
+    week_end = (dt.date.fromisoformat(week_start) + dt.timedelta(days=6)).isoformat()
+    result = await asyncio.to_thread(
+        lambda: supabase.table("nutrition_logs")
+            .select("*")
+            .gte("date", week_start)
+            .lte("date", week_end)
+            .order("date")
+            .execute()
+    )
+    return result.data
+
+
+async def get_nutrition_plan() -> dict | None:
+    """Restituisce il piano nutrizionale attivo (l'unico record in nutrition_plan)."""
+    result = await asyncio.to_thread(
+        lambda: supabase.table("nutrition_plan")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+async def save_nutrition_plan(
+    diet_type: str,
+    allergies: list[str],
+    targets: dict,
+    foods: dict,
+    notes: str,
+    source: str,
+) -> None:
+    """Salva (upsert) il piano nutrizionale. Sovrascrive il record esistente."""
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    await asyncio.to_thread(
+        lambda: supabase.table("nutrition_plan").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+    )
+    await asyncio.to_thread(
+        lambda: supabase.table("nutrition_plan").upsert({
+            "diet_type": diet_type,
+            "allergies": allergies,
+            "targets": targets,
+            "foods": foods,
+            "notes": notes,
+            "source": source,
+            "updated_at": now,
+        }).execute()
+    )
+
+
+async def upsert_nutrition_targets(targets: dict) -> None:
+    """Aggiorna solo i campi targets nel piano esistente (merge, non sovrascrittura)."""
+    existing = await get_nutrition_plan()
+    if existing is None:
+        return
+    merged = {**existing.get("targets", {}), **targets}
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    await asyncio.to_thread(
+        lambda: supabase.table("nutrition_plan")
+            .update({"targets": merged, "updated_at": now})
+            .eq("id", existing["id"])
+            .execute()
+    )
