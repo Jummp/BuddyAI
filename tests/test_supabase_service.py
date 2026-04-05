@@ -129,3 +129,46 @@ async def test_upsert_nutrition_targets_merges_targets(mock_supabase):
     from backend.services.supabase import upsert_nutrition_targets
     await upsert_nutrition_targets({"iron_mg": 18, "protein_g": 150})
     mock_supabase.table.return_value.update.assert_called_once()
+
+
+async def test_get_habit_definitions_returns_list(mock_supabase):
+    mock_supabase.table.return_value.select.return_value.order.return_value.execute.return_value.data = [
+        {"id": "def-uuid", "name": "lettura", "habit_type": "habit", "unit": "min", "target": 420.0}
+    ]
+    from backend.services.supabase import get_habit_definitions
+    result = await get_habit_definitions()
+    assert isinstance(result, list)
+    assert result[0]["name"] == "lettura"
+
+
+async def test_save_habit_definition_calls_insert(mock_supabase):
+    mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [
+        {"id": "new-uuid", "name": "meditazione", "habit_type": "habit", "unit": "min", "target": 140.0}
+    ]
+    from backend.services.supabase import save_habit_definition
+    result = await save_habit_definition("meditazione", "habit", "min", 140.0)
+    mock_supabase.table.assert_called_with("habit_definitions")
+    mock_supabase.table.return_value.insert.assert_called_once()
+    assert result["id"] == "new-uuid"
+
+
+async def test_save_habit_log_calls_insert(mock_supabase):
+    mock_supabase.table.return_value.insert.return_value.execute = MagicMock()
+    from backend.services.supabase import save_habit_log
+    await save_habit_log("def-uuid", "2026-04-05", 30.0, "ho letto mezz'ora")
+    mock_supabase.table.assert_called_with("habit_logs")
+    mock_supabase.table.return_value.insert.assert_called_once()
+
+
+async def test_get_weekly_habit_logs_returns_list(mock_supabase):
+    mock_supabase.table.return_value.select.return_value.gte.return_value.lte.return_value.order.return_value.execute.return_value.data = [
+        {
+            "id": "log-uuid", "habit_id": "def-uuid", "date": "2026-04-05",
+            "value": 30.0, "description": "ho letto",
+            "habit_definitions": {"name": "lettura", "habit_type": "habit", "unit": "min", "target": 420.0}
+        }
+    ]
+    from backend.services.supabase import get_weekly_habit_logs
+    result = await get_weekly_habit_logs("2026-03-31")
+    assert isinstance(result, list)
+    assert result[0]["habit_definitions"]["name"] == "lettura"

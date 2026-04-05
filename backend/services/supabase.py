@@ -178,3 +178,51 @@ async def upsert_nutrition_targets(targets: dict) -> None:
             .eq("id", existing["id"])
             .execute()
     )
+
+
+async def get_habit_definitions() -> list[dict]:
+    """Restituisce tutte le habit/limit definite dall'utente."""
+    result = await asyncio.to_thread(
+        lambda: supabase.table("habit_definitions")
+            .select("*")
+            .order("created_at")
+            .execute()
+    )
+    return result.data
+
+
+async def save_habit_definition(name: str, habit_type: str, unit: str, target: float) -> dict:
+    """Crea una nuova habit/limit. Restituisce il record creato (con id)."""
+    result = await asyncio.to_thread(
+        lambda: supabase.table("habit_definitions")
+            .insert({"name": name, "habit_type": habit_type, "unit": unit, "target": target})
+            .execute()
+    )
+    return result.data[0]
+
+
+async def save_habit_log(habit_id: str, date: str, value: float, description: str) -> None:
+    """Salva un log per la data specificata."""
+    await asyncio.to_thread(
+        lambda: supabase.table("habit_logs").insert({
+            "habit_id": habit_id,
+            "date": date,
+            "value": value,
+            "description": description,
+        }).execute()
+    )
+
+
+async def get_weekly_habit_logs(week_start: str) -> list[dict]:
+    """Restituisce tutti i log dalla data week_start a +6 giorni,
+    con join su habit_definitions (name, habit_type, unit, target)."""
+    week_end = (datetime.date.fromisoformat(week_start) + datetime.timedelta(days=6)).isoformat()
+    result = await asyncio.to_thread(
+        lambda: supabase.table("habit_logs")
+            .select("*, habit_definitions(name, habit_type, unit, target)")
+            .gte("date", week_start)
+            .lte("date", week_end)
+            .order("date")
+            .execute()
+    )
+    return result.data
