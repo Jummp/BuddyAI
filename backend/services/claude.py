@@ -1,4 +1,5 @@
 import json
+import re
 from typing import AsyncGenerator
 import anthropic
 from backend.config import get_settings
@@ -39,13 +40,18 @@ _SYSTEM_PROMPTS = {
 }
 
 
+def _strip_markdown(text: str) -> str:
+    """Rimuove i backtick markdown (```json ... ```) dalla risposta di Claude."""
+    return re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.MULTILINE).strip()
+
+
 async def classify_intent(text: str) -> IntentResult:
     response = await client.messages.create(
         model=HAIKU_MODEL,
         max_tokens=256,
         messages=[{"role": "user", "content": f"{_INTENT_PROMPT}\n{text}"}],
     )
-    raw = response.content[0].text.strip()
+    raw = _strip_markdown(response.content[0].text)
     try:
         data = json.loads(raw)
         return IntentResult(intent=data["intent"], tone=data["tone"])
@@ -75,7 +81,7 @@ async def summarize_and_extract(text: str) -> tuple[str, dict]:
         max_tokens=512,
         messages=[{"role": "user", "content": f"{_MEMORY_PROMPT}\n{text}"}],
     )
-    raw = response.content[0].text.strip()
+    raw = _strip_markdown(response.content[0].text)
     try:
         data = json.loads(raw)
         return data["summary"], data["entities"]
