@@ -1,4 +1,5 @@
 import re
+import asyncio
 import datetime
 from backend.services.supabase import get_block_exercises, get_video_link, save_video_link
 from backend.services.youtube import search_video
@@ -54,15 +55,18 @@ async def build_training_context(block: str) -> str:
 
         video = await get_video_link(name)
         if video is None:
-            video = await search_video(name)
+            try:
+                video = await asyncio.wait_for(search_video(name), timeout=3.0)
+            except (asyncio.TimeoutError, Exception):
+                video = None
             if video:
                 await save_video_link(name, video["url"], video["title"], "youtube")
 
         if video:
             video_title = video["title"] or ""
-            lines.append(f"    📹 {video['url']} ({video_title})")
+            lines.append(f"    [video] {video['url']} ({video_title})")
         else:
-            lines.append("    📹 nessun video disponibile")
+            lines.append("    [video] nessun video disponibile")
 
     month = min(datetime.date.today().month, 6)
     focus = MONTH_FOCUS.get(month, "")

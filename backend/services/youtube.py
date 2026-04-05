@@ -2,6 +2,8 @@ import asyncio
 from googleapiclient.discovery import build
 from backend.config import get_settings
 
+_settings = get_settings()
+
 
 async def search_video(exercise_name: str) -> dict | None:
     """Cerca il miglior video tutorial per l'esercizio su YouTube.
@@ -14,8 +16,7 @@ async def search_video(exercise_name: str) -> dict | None:
 
 
 def _sync_search(exercise_name: str) -> dict | None:
-    settings = get_settings()
-    youtube = build("youtube", "v3", developerKey=settings.youtube_api_key)
+    youtube = build("youtube", "v3", developerKey=_settings.youtube_api_key)
     resp = youtube.search().list(
         q=f"{exercise_name} tutorial form",
         type="video",

@@ -14,6 +14,15 @@ from backend.config import get_settings
 from supabase import create_client
 
 
+def _to_str(val) -> str:
+    """Normalize a cell value to string. Converts float integers to int strings."""
+    if val is None:
+        return ""
+    if isinstance(val, float) and val == int(val):
+        return str(int(val))
+    return str(val)
+
+
 def parse_exercises(path: str) -> list[dict]:
     wb = openpyxl.load_workbook(path)
     ws = wb.active
@@ -41,21 +50,13 @@ def parse_exercises(path: str) -> list[dict]:
         if current_block is None or col_b is None:
             continue
 
-        # Normalize numeric values to strings
-        def to_str(val) -> str:
-            if val is None:
-                return ""
-            if isinstance(val, float) and val == int(val):
-                return str(int(val))
-            return str(val)
-
         exercises.append({
             "block": current_block,
-            "drill_id": to_str(col_a),
+            "drill_id": _to_str(col_a),
             "exercise_name": str(col_b).strip(),
-            "sets": to_str(col_c),
-            "reps": to_str(col_d),
-            "rest": to_str(col_e),
+            "sets": _to_str(col_c),
+            "reps": _to_str(col_d),
+            "rest": _to_str(col_e),
         })
 
     return exercises
@@ -76,7 +77,7 @@ def load(path: str) -> None:
             on_conflict="block,exercise_name",
         ).execute()
 
-    print(f"Caricati {len(exercises)} esercizi su Supabase.")
+    print(f"OK: Caricati {len(exercises)} esercizi su Supabase.")
     for ex in exercises:
         print(f"  [{ex['block']}] {ex['drill_id']}. {ex['exercise_name']} — {ex['sets']}x{ex['reps']} rest {ex['rest']}")
 
