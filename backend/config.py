@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     openai_api_key: str
     supabase_url: str
     supabase_key: str
+    youtube_api_key: str
 
 
 @lru_cache(maxsize=1)
