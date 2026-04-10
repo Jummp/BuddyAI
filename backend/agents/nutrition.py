@@ -3,8 +3,12 @@ from backend.services.supabase import (
     get_nutrition_plan,
     save_nutrition_log,
     get_weekly_nutrition,
+    get_fridge_items,
+    upsert_fridge_item,
+    remove_fridge_items,
 )
-from backend.services.nutrition_estimator import estimate_nutrients
+from backend.services.nutrition_estimator import estimate_nutrients, extract_food_description
+from backend.services.fridge_extractor import extract_fridge_items
 
 _WEEKLY_KEYWORDS = {"settimana", "riepilogo", "summary", "settimanale"}
 
@@ -78,16 +82,19 @@ async def log_meal(text: str) -> str:
     targets = plan["targets"] if plan else _DEFAULT_TARGETS
     foods = plan.get("foods", {}) if plan else {}
 
-    nutrients = await estimate_nutrients(text, diet_type, allergies)
+    food_desc = await extract_food_description(text)
+    if not food_desc:
+        return "Nessun alimento rilevato nel messaggio."
+    nutrients = await estimate_nutrients(food_desc, diet_type, allergies)
     today = datetime.date.today().isoformat()
-    await save_nutrition_log(today, text, nutrients)
+    await save_nutrition_log(today, food_desc, nutrients)
 
     # Compute today's total (including this meal)
     logs_today = await get_weekly_nutrition(today)
     daily_totals = _compute_daily_totals(logs_today)
 
     # Build telegraphic context
-    lines = [f"Log: {text[:60]}"]
+    lines = [f"Log: {food_desc[:80]}"]
     main = (
         f"~{int(nutrients.get('calories_kcal', 0))}kcal"
         f" · {nutrients.get('protein_g', 0)}g prot"
@@ -128,6 +135,86 @@ async def get_weekly_summary(week_start: str | None = None) -> str:
         lines.append(f"{label}: {avg}{unit}/{target}{unit} ({pct}%){flag}")
 
     return "\n".join(lines)
+
+
+async def log_fridge(text: str) -> str:
+    """Aggiorna lo store frigo dal testo in linguaggio naturale."""
+    items = await extract_fridge_items(text)
+    if not items:
+        return ""
+
+    added = []
+    removed = []
+    for item in items:
+        if item.get("action") == "add":
+            await upsert_fridge_item(
+                name=item["name"],
+                quantity=item.get("quantity", 0),
+                unit=item.get("unit", ""),
+            )
+            added.append(f"{item['name']} {item.get('quantity', '')}{item.get('unit', '')}")
+        elif item.get("action") == "remove":
+            await remove_fridge_items([item["name"]])
+            removed.append(item["name"])
+
+    lines = []
+    if added:
+        lines.append(f"Frigo aggiornato: {', '.join(added)}")
+    if removed:
+        lines.append(f"Rimossi: {', '.join(removed)}")
+    return "\n".join(lines)
+
+
+async def suggest_meals() -> str:
+    """Suggerisce 2 piatti (semplice + complesso) in base a frigo e target nutrizionali."""
+    import anthropic
+    from backend.config import get_settings
+
+    fridge = await get_fridge_items()
+    plan = await get_nutrition_plan()
+    targets = plan["targets"] if plan else _DEFAULT_TARGETS
+    diet_type = plan["diet_type"] if plan else "omnivore"
+
+    today = datetime.date.today().isoformat()
+    logs_today = await get_weekly_nutrition(today)
+    consumed = _compute_daily_totals(logs_today)
+
+    remaining = {
+        k: max(0, targets.get(k, _DEFAULT_TARGETS.get(k, 0)) - consumed.get(k, 0))
+        for k in ("calories_kcal", "protein_g", "carbs_g", "fat_g")
+    }
+
+    if not fridge:
+        return "Frigo vuoto. Aggiungi ingredienti prima di chiedere suggerimenti."
+
+    fridge_str = ", ".join(
+        f"{i['name']} ({i['quantity']}{i['unit']})" for i in fridge
+    )
+    remaining_str = (
+        f"~{int(remaining['calories_kcal'])}kcal rimanenti · "
+        f"{remaining['protein_g']:.0f}g prot · "
+        f"{remaining['carbs_g']:.0f}g carbs · "
+        f"{remaining['fat_g']:.0f}g grassi"
+    )
+
+    prompt = f"""Sei un nutrizionista. Suggerisci esattamente 2 piatti usando solo gli ingredienti disponibili.
+Dieta: {diet_type}
+Frigo: {fridge_str}
+Target rimanenti oggi: {remaining_str}
+
+Rispondi in italiano ultra-compatto con questo formato esatto:
+SEMPLICE: <nome piatto>
+→ <ingredienti principali> · ~<kcal>kcal · <prot>g prot
+COMPLESSO: <nome piatto>
+→ <ingredienti principali> · ~<kcal>kcal · <prot>g prot"""
+
+    sonnet_client = anthropic.AsyncAnthropic(api_key=get_settings().anthropic_api_key)
+    response = await sonnet_client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=256,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text.strip()
 
 
 async def generate_plan(objectives: str) -> str:

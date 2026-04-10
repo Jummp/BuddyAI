@@ -46,7 +46,7 @@ async def test_voice_unsupported_format_returns_400():
 
 async def test_memories_returns_list():
     from backend.main import app
-    with patch("backend.main.get_memories", new_callable=AsyncMock) as mock_m:
+    with patch("backend.api.memories.get_memories", new_callable=AsyncMock) as mock_m:
         mock_m.return_value = [{"id": "abc", "summary": "test"}]
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/memories?limit=10&offset=0")

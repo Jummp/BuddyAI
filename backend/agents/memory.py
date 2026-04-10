@@ -6,11 +6,11 @@ logger = logging.getLogger(__name__)
 
 
 async def process(text: str) -> None:
-    """Extract summary and entities from text and save to Supabase.
+    """Extract summary, tags and entities from text and save to Supabase.
     Executed in background — failures are logged, not propagated.
     """
     try:
-        summary, entities = await summarize_and_extract(text)
-        await save_memory(raw_text=text, summary=summary, entities=entities)
+        summary, tags, entities = await summarize_and_extract(text)
+        await save_memory(raw_text=text, summary=summary, tags=tags, entities=entities)
     except Exception as e:
         logger.error(f"Memory Agent error: {e}")

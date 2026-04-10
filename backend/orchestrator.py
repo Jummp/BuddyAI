@@ -48,6 +48,24 @@ async def process(text: str) -> AsyncIterator[str]:
         extra_system = await log_meal(text)
         intent_result = IntentResult(intent=intent_result.intent, tone="nutrition")
 
+    # 4c. Build habit context if requested
+    if "habit_update" in intent_result.intent and "training_request" not in intent_result.intent:
+        from backend.agents.habit import process_habit  # noqa: PLC0415
+        extra_system = await process_habit(text)
+        intent_result = IntentResult(intent=intent_result.intent, tone="habit")
+
+    # 4d. Update fridge store
+    if "fridge_update" in intent_result.intent:
+        from backend.agents.nutrition import log_fridge  # noqa: PLC0415
+        extra_system = await log_fridge(text)
+        intent_result = IntentResult(intent=intent_result.intent, tone="nutrition")
+
+    # 4e. Meal suggestion from fridge
+    if "meal_suggestion" in intent_result.intent:
+        from backend.agents.nutrition import suggest_meals  # noqa: PLC0415
+        extra_system = await suggest_meals()
+        intent_result = IntentResult(intent=intent_result.intent, tone="meal_suggestion")
+
     # 5. Build message history with new message (max 20)
     messages = (history + [{"role": "user", "content": text}])[-20:]
 
