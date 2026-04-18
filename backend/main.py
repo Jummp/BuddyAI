@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import field_validator
 from backend.models import ChatRequest
 from backend.orchestrator import process as orchestrate
+from backend.config import missing_required_settings
 from backend.services.whisper import transcribe
 from backend.services.scheduler import setup_scheduler
 from backend.api.push import router as push_router
@@ -54,7 +55,12 @@ class ChatRequestValidated(ChatRequest):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "0.2.0"}
+    missing = missing_required_settings()
+    return {
+        "status": "ok" if not missing else "degraded",
+        "version": "0.2.0",
+        "missing_settings": missing,
+    }
 
 
 @app.options("/{rest_of_path:path}")

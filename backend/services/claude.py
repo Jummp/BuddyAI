@@ -1,5 +1,6 @@
 import json
 import re
+from functools import lru_cache
 from typing import AsyncGenerator
 import anthropic
 from backend.config import get_settings
@@ -7,8 +8,6 @@ from backend.models import IntentResult
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 SONNET_MODEL = "claude-sonnet-4-6"
-
-client = anthropic.AsyncAnthropic(api_key=get_settings().anthropic_api_key)
 
 _INTENT_PROMPT = """Sei un classificatore di intent per un'app companion comportamentale.
 Analizza il messaggio e restituisci SOLO un JSON valido:
@@ -69,6 +68,26 @@ _SYSTEM_PROMPTS = {
 def _strip_markdown(text: str) -> str:
     """Rimuove i backtick markdown (```json ... ```) dalla risposta di Claude."""
     return re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.MULTILINE).strip()
+
+
+def _require_anthropic_api_key() -> str:
+    api_key = get_settings().anthropic_api_key
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY non configurata")
+    return api_key
+
+
+@lru_cache(maxsize=1)
+def get_anthropic_client() -> anthropic.AsyncAnthropic:
+    return anthropic.AsyncAnthropic(api_key=_require_anthropic_api_key())
+
+
+class _AnthropicProxy:
+    def __getattr__(self, name: str):
+        return getattr(get_anthropic_client(), name)
+
+
+client = _AnthropicProxy()
 
 
 async def _track(model: str, usage: any, endpoint: str) -> None:

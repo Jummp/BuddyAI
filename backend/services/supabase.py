@@ -1,11 +1,36 @@
 import asyncio
 import datetime
+from functools import lru_cache
 from typing import Optional
 from supabase import create_client, Client
 from backend.config import get_settings
 
-settings = get_settings()
-supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
+
+def _require_supabase_url() -> str:
+    url = get_settings().supabase_url
+    if not url:
+        raise RuntimeError("SUPABASE_URL non configurata")
+    return url
+
+
+def _require_supabase_key() -> str:
+    key = get_settings().supabase_key
+    if not key:
+        raise RuntimeError("SUPABASE_KEY non configurata")
+    return key
+
+
+@lru_cache(maxsize=1)
+def get_supabase_client() -> Client:
+    return create_client(_require_supabase_url(), _require_supabase_key())
+
+
+class _SupabaseProxy:
+    def __getattr__(self, name: str):
+        return getattr(get_supabase_client(), name)
+
+
+supabase = _SupabaseProxy()
 
 
 async def save_memory(raw_text: str, summary: str, tags: list, entities: dict) -> None:
