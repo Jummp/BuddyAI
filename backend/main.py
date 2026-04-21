@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import base64
+import json
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form
 from fastapi.responses import StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +43,16 @@ app.include_router(nutrition_router)
 app.include_router(memories_router)
 app.include_router(settings_router)
 app.include_router(tokens_router)
+
+_MOBILE_RESPONSE_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _cache_mobile_response(message_id: str, payload: dict) -> None:
+    now = __import__("time").time()
+    expired = [key for key, (ts, _) in _MOBILE_RESPONSE_CACHE.items() if now - ts > 300]
+    for key in expired:
+        _MOBILE_RESPONSE_CACHE.pop(key, None)
+    _MOBILE_RESPONSE_CACHE[message_id] = (now, payload)
 
 
 class ChatRequestValidated(ChatRequest):
@@ -86,6 +97,33 @@ async def chat(request: ChatRequestValidated):
             "Access-Control-Allow-Origin": "*",
         },
     )
+
+
+@app.post("/chat/mobile")
+async def chat_mobile(request: ChatRequestValidated):
+    """Versione non-streaming per client mobile che gestiscono male SSE."""
+    if request.client_message_id and request.client_message_id in _MOBILE_RESPONSE_CACHE:
+        return _MOBILE_RESPONSE_CACHE[request.client_message_id][1]
+
+    full_response = ""
+    memory_saved = False
+
+    async for chunk in orchestrate(request.text):
+        if not chunk.startswith("data: "):
+            continue
+        try:
+            event = json.loads(chunk[6:].strip())
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") == "token":
+            full_response += event.get("content", "")
+        elif event.get("type") == "done":
+            memory_saved = bool(event.get("memory_saved"))
+
+    payload = {"content": full_response, "memory_saved": memory_saved}
+    if request.client_message_id:
+        _cache_mobile_response(request.client_message_id, payload)
+    return payload
 
 
 @app.post("/voice")

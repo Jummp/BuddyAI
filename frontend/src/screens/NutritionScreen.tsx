@@ -1,47 +1,70 @@
 import React, { useEffect, useState } from "react";
-import {
-  View, Text, FlatList, Pressable, RefreshControl,
-  ActivityIndicator, Modal, TextInput, Alert,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
-import { apiGet, apiPost, apiDelete, apiPatch } from "../services/api";
+import { Fonts } from "../constants/typography";
+import { apiDelete, apiGet, apiPatch } from "../services/api";
+import { AccentButton, Eyebrow, FieldLabel, GlassCard, Pill, ScreenHeader, ScreenShell } from "../components/ui";
 
 type NutritionLog = {
   id: string;
   date: string;
   meal_description: string;
   nutrients: {
-    calories_kcal?: number; protein_g?: number;
-    carbs_g?: number; fat_g?: number; fiber_g?: number;
+    calories_kcal?: number;
+    protein_g?: number;
+    carbs_g?: number;
+    fat_g?: number;
+    fiber_g?: number;
+    iron_mg?: number;
+    calcium_mg?: number;
+    vitamin_d_ug?: number;
+    sodium_mg?: number;
+    vitamin_b12_ug?: number;
+    magnesium_mg?: number;
+    potassium_mg?: number;
+    zinc_mg?: number;
+    vitamin_c_mg?: number;
+    vitamin_a_ug?: number;
+    folate_ug?: number;
   };
   created_at: string;
 };
 
 type Plan = {
   targets?: {
-    calories_kcal?: number; protein_g?: number;
-    carbs_g?: number; fat_g?: number;
+    calories_kcal?: number;
+    protein_g?: number;
+    carbs_g?: number;
+    fat_g?: number;
   };
 };
 
-function MacroBar({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
+function MacroLine({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
   const pct = target > 0 ? Math.min(value / target, 1) : 0;
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-        <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>{label}</Text>
-        <Text style={{ color: Colors.textPrimary, fontSize: 12, fontWeight: "600" }}>{value}/{target}g</Text>
+    <View style={{ marginBottom: 12 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }}>
+        <Text style={{ color: Colors.textSecondary, fontSize: 12, fontFamily: Fonts.headlineBold, letterSpacing: 1.1, textTransform: "uppercase" }}>
+          {label}
+        </Text>
+        <Text style={{ color, fontSize: 12, fontFamily: Fonts.monoMedium }}>
+          {value}/{target}g
+        </Text>
       </View>
-      <View style={{ height: 4, backgroundColor: Colors.surface2, borderRadius: 2 }}>
-        <View style={{ width: `${pct * 100}%`, height: 4, backgroundColor: color, borderRadius: 2 }} />
+      <View style={{ height: 4, borderRadius: 999, backgroundColor: Colors.surface3, overflow: "hidden" }}>
+        <View style={{ width: `${pct * 100}%`, height: 4, backgroundColor: color }} />
       </View>
     </View>
   );
 }
 
-function EditLogModal({ log, onClose, onSave }: {
+function EditLogModal({
+  log,
+  onClose,
+  onSave,
+}: {
   log: NutritionLog;
   onClose: () => void;
   onSave: (id: string, description: string, nutrients: NutritionLog["nutrients"]) => Promise<void>;
@@ -51,7 +74,30 @@ function EditLogModal({ log, onClose, onSave }: {
   const [prot, setProt] = useState(String(Math.round(log.nutrients.protein_g ?? 0)));
   const [carbs, setCarbs] = useState(String(Math.round(log.nutrients.carbs_g ?? 0)));
   const [fat, setFat] = useState(String(Math.round(log.nutrients.fat_g ?? 0)));
+  const [iron, setIron] = useState(String(Math.round(log.nutrients.iron_mg ?? 0)));
+  const [calcium, setCalcium] = useState(String(Math.round(log.nutrients.calcium_mg ?? 0)));
+  const [vitaminD, setVitaminD] = useState(String(Math.round(log.nutrients.vitamin_d_ug ?? 0)));
+  const [sodium, setSodium] = useState(String(Math.round(log.nutrients.sodium_mg ?? 0)));
+  const [b12, setB12] = useState(String(Math.round(log.nutrients.vitamin_b12_ug ?? 0)));
+  const [magnesium, setMagnesium] = useState(String(Math.round(log.nutrients.magnesium_mg ?? 0)));
+  const [potassium, setPotassium] = useState(String(Math.round(log.nutrients.potassium_mg ?? 0)));
+  const [zinc, setZinc] = useState(String(Math.round(log.nutrients.zinc_mg ?? 0)));
+  const [vitaminC, setVitaminC] = useState(String(Math.round(log.nutrients.vitamin_c_mg ?? 0)));
+  const [vitaminA, setVitaminA] = useState(String(Math.round(log.nutrients.vitamin_a_ug ?? 0)));
+  const [folate, setFolate] = useState(String(Math.round(log.nutrients.folate_ug ?? 0)));
   const [saving, setSaving] = useState(false);
+
+  const inputStyle = {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.ghostBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: Colors.textPrimary,
+    fontFamily: Fonts.bodyRegular,
+    marginBottom: 12,
+  } as const;
 
   const save = async () => {
     setSaving(true);
@@ -62,6 +108,17 @@ function EditLogModal({ log, onClose, onSave }: {
         protein_g: Number(prot) || 0,
         carbs_g: Number(carbs) || 0,
         fat_g: Number(fat) || 0,
+        iron_mg: Number(iron) || 0,
+        calcium_mg: Number(calcium) || 0,
+        vitamin_d_ug: Number(vitaminD) || 0,
+        sodium_mg: Number(sodium) || 0,
+        vitamin_b12_ug: Number(b12) || 0,
+        magnesium_mg: Number(magnesium) || 0,
+        potassium_mg: Number(potassium) || 0,
+        zinc_mg: Number(zinc) || 0,
+        vitamin_c_mg: Number(vitaminC) || 0,
+        vitamin_a_ug: Number(vitaminA) || 0,
+        folate_ug: Number(folate) || 0,
       });
       onClose();
     } finally {
@@ -69,61 +126,44 @@ function EditLogModal({ log, onClose, onSave }: {
     }
   };
 
-  const inputStyle = {
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: Colors.textPrimary,
-    fontSize: 15,
-    marginBottom: 10,
-  };
-
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "flex-end" }}>
-        <View style={{ backgroundColor: Colors.surface2, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <Text style={{ color: Colors.textPrimary, fontSize: 17, fontWeight: "700" }}>Modifica pasto</Text>
-            <Pressable onPress={onClose}><Text style={{ color: Colors.textSecondary, fontSize: 16 }}>✕</Text></Pressable>
-          </View>
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.82)" }}>
+        <View style={{ backgroundColor: Colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22 }}>
+          <Eyebrow text="Nutrition Log Editor" tone="secondary" />
+          <Text style={{ color: Colors.textPrimary, fontSize: 24, fontFamily: Fonts.headlineBold, marginBottom: 16 }}>
+            Edit meal
+          </Text>
 
-          <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 4 }}>Descrizione</Text>
-          <TextInput
-            value={desc} onChangeText={setDesc}
-            multiline style={[inputStyle, { minHeight: 60 }]}
-            placeholderTextColor={Colors.textSecondary}
-          />
+          <FieldLabel text="Description" />
+          <TextInput value={desc} onChangeText={setDesc} multiline style={[inputStyle, { minHeight: 72 }]} placeholderTextColor={Colors.textMuted} />
 
-          <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 8 }}>Macros</Text>
-          <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
+          <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
             {[
-              { label: "kcal", val: kcal, set: setKcal },
-              { label: "prot g", val: prot, set: setProt },
-              { label: "carbs g", val: carbs, set: setCarbs },
-              { label: "fat g", val: fat, set: setFat },
-            ].map(({ label, val, set }) => (
-              <View key={label} style={{ flex: 1 }}>
-                <Text style={{ color: Colors.textSecondary, fontSize: 11, marginBottom: 4 }}>{label}</Text>
-                <TextInput
-                  value={val} onChangeText={set}
-                  keyboardType="numeric"
-                  style={{ backgroundColor: Colors.surface, borderRadius: 8, padding: 8, color: Colors.textPrimary, fontSize: 14, textAlign: "center" }}
-                />
+              { label: "Kcal", value: kcal, setValue: setKcal },
+              { label: "Protein (g)", value: prot, setValue: setProt },
+              { label: "Carbs (g)", value: carbs, setValue: setCarbs },
+              { label: "Fat (g)", value: fat, setValue: setFat },
+              { label: "Iron (mg)", value: iron, setValue: setIron },
+              { label: "Calcium (mg)", value: calcium, setValue: setCalcium },
+              { label: "Vit D (μg)", value: vitaminD, setValue: setVitaminD },
+              { label: "Sodium (mg)", value: sodium, setValue: setSodium },
+              { label: "B12 (μg)", value: b12, setValue: setB12 },
+              { label: "Magnesium (mg)", value: magnesium, setValue: setMagnesium },
+              { label: "Potassium (mg)", value: potassium, setValue: setPotassium },
+              { label: "Zinc (mg)", value: zinc, setValue: setZinc },
+              { label: "Vit C (mg)", value: vitaminC, setValue: setVitaminC },
+              { label: "Vit A (μg)", value: vitaminA, setValue: setVitaminA },
+              { label: "Folate (μg)", value: folate, setValue: setFolate },
+            ].map((field) => (
+              <View key={field.label} style={{ flexBasis: "48%" }}>
+                <FieldLabel text={field.label} />
+                <TextInput value={field.value} onChangeText={field.setValue} keyboardType="numeric" style={inputStyle} placeholderTextColor={Colors.textMuted} />
               </View>
             ))}
           </View>
 
-          <Pressable
-            onPress={save}
-            disabled={saving}
-            style={({ pressed }) => ({
-              backgroundColor: Colors.primary, borderRadius: 12, padding: 14, alignItems: "center",
-              opacity: pressed || saving ? 0.7 : 1,
-            })}
-          >
-            <Text style={{ color: Colors.black, fontWeight: "700" }}>{saving ? "Salvo..." : "Salva"}</Text>
-          </Pressable>
+          <AccentButton label={saving ? "Saving..." : "Save Meal"} onPress={save} disabled={saving} />
         </View>
       </View>
     </Modal>
@@ -131,7 +171,6 @@ function EditLogModal({ log, onClose, onSave }: {
 }
 
 export default function NutritionScreen() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [logs, setLogs] = useState<NutritionLog[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -139,6 +178,8 @@ export default function NutritionScreen() {
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [loadingSugg, setLoadingSugg] = useState(false);
   const [editLog, setEditLog] = useState<NutritionLog | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [logsOpen, setLogsOpen] = useState(true);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -150,22 +191,40 @@ export default function NutritionScreen() {
       ]);
       setLogs(logsData);
       setPlan(planData);
-    } catch {}
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    }
   };
 
-  useEffect(() => { load(); }, []);
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  useEffect(() => {
+    load();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      load();
+    }, [today])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
 
   const deleteLog = (id: string) => {
     Alert.alert("Elimina pasto", "Sicuro?", [
       { text: "Annulla", style: "cancel" },
       {
-        text: "Elimina", style: "destructive", onPress: async () => {
+        text: "Elimina",
+        style: "destructive",
+        onPress: async () => {
           try {
             await apiDelete(`/nutrition/logs/${id}`);
-            setLogs((prev) => prev.filter((l) => l.id !== id));
-          } catch {
-            Alert.alert("Errore nell'eliminazione");
+            setLogs((prev) => prev.filter((log) => log.id !== id));
+          } catch (e: any) {
+            Alert.alert("Errore", e.message);
           }
         },
       },
@@ -173,19 +232,20 @@ export default function NutritionScreen() {
   };
 
   const saveEdit = async (id: string, description: string, nutrients: NutritionLog["nutrients"]) => {
-    const updated = await apiPatch<NutritionLog>(`/nutrition/logs/${id}`, {
-      meal_description: description,
-      nutrients,
-    });
-    setLogs((prev) => prev.map((l) => l.id === id ? { ...l, ...updated } : l));
+    try {
+      const updated = await apiPatch<NutritionLog>(`/nutrition/logs/${id}`, { meal_description: description, nutrients });
+      setLogs((prev) => prev.map((log) => (log.id === id ? { ...log, ...updated } : log)));
+    } catch (e: any) {
+      Alert.alert("Errore", e.message);
+      throw e;
+    }
   };
 
   const targets = plan?.targets ?? { calories_kcal: 2000, protein_g: 150, carbs_g: 200, fat_g: 70 };
-  const totalKcal = Math.round(logs.reduce((s, l) => s + (l.nutrients.calories_kcal ?? 0), 0));
-  const totalProt = Math.round(logs.reduce((s, l) => s + (l.nutrients.protein_g ?? 0), 0));
-  const totalCarbs = Math.round(logs.reduce((s, l) => s + (l.nutrients.carbs_g ?? 0), 0));
-  const totalFat = Math.round(logs.reduce((s, l) => s + (l.nutrients.fat_g ?? 0), 0));
-  const kcalPct = Math.min(totalKcal / (targets.calories_kcal ?? 2000), 1);
+  const totalKcal = Math.round(logs.reduce((sum, log) => sum + (log.nutrients.calories_kcal ?? 0), 0));
+  const totalProt = Math.round(logs.reduce((sum, log) => sum + (log.nutrients.protein_g ?? 0), 0));
+  const totalCarbs = Math.round(logs.reduce((sum, log) => sum + (log.nutrients.carbs_g ?? 0), 0));
+  const totalFat = Math.round(logs.reduce((sum, log) => sum + (log.nutrients.fat_g ?? 0), 0));
 
   const getMealSuggestion = async () => {
     setLoadingSugg(true);
@@ -193,126 +253,115 @@ export default function NutritionScreen() {
     try {
       const data = await apiGet<{ suggestion: string }>("/nutrition/suggest");
       setSuggestion(data.suggestion || "Nessun suggerimento disponibile");
-    } catch {
-      setSuggestion("Errore nel recupero suggerimenti");
+    } catch (e: any) {
+      setSuggestion(e.message || "Errore nel recupero suggerimenti");
     } finally {
       setLoadingSugg(false);
     }
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.black }}>
-      {/* Header */}
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: 12, flexDirection: "row", alignItems: "center" }}>
-        <Pressable onPress={() => navigation.goBack()} style={{ marginRight: 12 }} accessibilityRole="button">
-          <Text style={{ color: Colors.primary, fontSize: 18 }}>←</Text>
-        </Pressable>
-        <Text style={{ color: Colors.textPrimary, fontSize: 22, fontWeight: "700", flex: 1 }}>Nutrizione</Text>
-        <Pressable onPress={() => navigation.navigate("Fridge")} accessibilityRole="button">
-          <Text style={{ color: Colors.primary, fontSize: 22 }}>🛒</Text>
-        </Pressable>
-      </View>
+    <ScreenShell>
+      <ScreenHeader
+        title="Nutrition"
+        subtitle="Macro overview, meal logs e accesso al fridge in un pannello più vicino al mockup neon-terminal."
+        onBack={() => navigation.goBack()}
+        right={<Pill label="Fridge" tone="tertiary" onPress={() => navigation.navigate("Fridge")} icon={<MaterialIcons name="inventory-2" size={14} color={Colors.tertiary} />} />}
+      />
+
+      {error ? (
+        <GlassCard style={{ marginBottom: 12 }}>
+          <Text style={{ color: Colors.error, fontFamily: Fonts.bodyMedium }}>{error}</Text>
+        </GlassCard>
+      ) : null}
 
       <FlatList
         data={logs}
-        keyExtractor={(l) => l.id}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+        keyExtractor={(log) => log.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+        contentContainerStyle={{ paddingBottom: 30 }}
         ListHeaderComponent={
           <>
-            {/* Kcal overview */}
-            <View style={{ backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 12 }}>
-              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 4 }}>Oggi</Text>
-              <Text style={{ color: Colors.textPrimary, fontSize: 24, fontWeight: "700", marginBottom: 8 }}>
-                {totalKcal} <Text style={{ fontSize: 16, fontWeight: "400", color: Colors.textSecondary }}>/ {targets.calories_kcal ?? 2000} kcal</Text>
+            <GlassCard accent style={{ marginBottom: 14 }}>
+              <Eyebrow text="Today's Intake" tone="primary" />
+              <Text style={{ color: Colors.textPrimary, fontSize: 36, fontFamily: Fonts.headlineBold }}>
+                {totalKcal}
+                <Text style={{ color: Colors.textSecondary, fontSize: 18, fontFamily: Fonts.bodyRegular }}> / {targets.calories_kcal ?? 2000} kcal</Text>
               </Text>
-              <View style={{ height: 6, backgroundColor: Colors.surface2, borderRadius: 3, marginBottom: 16 }}>
-                <View style={{ width: `${kcalPct * 100}%`, height: 6, backgroundColor: Colors.primary, borderRadius: 3 }} />
+              <Text style={{ color: Colors.textSecondary, fontSize: 15, lineHeight: 23, marginTop: 10, marginBottom: 18, fontFamily: Fonts.bodyRegular }}>
+                Snapshot giornaliero leggibile prima dei dettagli: alto contrasto, pochi numeri, subito azione.
+              </Text>
+              <MacroLine label="Protein" value={totalProt} target={targets.protein_g ?? 150} color={Colors.primary} />
+              <MacroLine label="Carbs" value={totalCarbs} target={targets.carbs_g ?? 200} color={Colors.secondary} />
+              <MacroLine label="Fat" value={totalFat} target={targets.fat_g ?? 70} color={Colors.tertiary} />
+            </GlassCard>
+
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
+              <View style={{ flex: 1 }}>
+                <AccentButton label="Log From Chat" onPress={() => navigation.navigate("Chat")} />
               </View>
-              <View style={{ gap: 10 }}>
-                <MacroBar label="Proteine" value={totalProt} target={targets.protein_g ?? 150} color={Colors.accent} />
-                <MacroBar label="Carboidrati" value={totalCarbs} target={targets.carbs_g ?? 200} color={Colors.primary} />
-                <MacroBar label="Grassi" value={totalFat} target={targets.fat_g ?? 70} color={Colors.warning} />
+              <View style={{ flex: 1 }}>
+                <AccentButton label={loadingSugg ? "Thinking..." : "Meal Suggest"} onPress={getMealSuggestion} disabled={loadingSugg} tone="surface" />
               </View>
             </View>
 
-            {/* CTA */}
-            <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
-              <Pressable
-                onPress={() => navigation.navigate("Chat")}
-                style={({ pressed }) => ({ flex: 1, backgroundColor: Colors.primary, borderRadius: 12, padding: 12, alignItems: "center", opacity: pressed ? 0.8 : 1 })}
-                accessibilityRole="button"
-              >
-                <Text style={{ color: Colors.black, fontWeight: "700" }}>+ Log pasto</Text>
-              </Pressable>
-              <Pressable
-                onPress={getMealSuggestion}
-                disabled={loadingSugg}
-                style={({ pressed }) => ({ flex: 1, backgroundColor: Colors.surface, borderRadius: 12, padding: 12, alignItems: "center", opacity: pressed || loadingSugg ? 0.7 : 1 })}
-                accessibilityRole="button"
-              >
-                {loadingSugg
-                  ? <ActivityIndicator size="small" color={Colors.primary} />
-                  : <Text style={{ color: Colors.primary, fontWeight: "700" }}>💡 Cosa mangio?</Text>
-                }
+            {suggestion ? (
+              <GlassCard style={{ marginBottom: 14 }}>
+                <Eyebrow text="PandorAI Suggestion" tone="secondary" />
+                <Text style={{ color: Colors.textPrimary, fontSize: 15, lineHeight: 24, fontFamily: Fonts.bodyRegular }}>{suggestion}</Text>
+              </GlassCard>
+            ) : null}
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <Text style={{ color: Colors.textSecondary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.4, textTransform: "uppercase" }}>
+                Meal Log / Today
+              </Text>
+              <Pressable onPress={() => setLogsOpen(!logsOpen)}>
+                <MaterialIcons name={logsOpen ? "expand-less" : "expand-more"} size={20} color={Colors.primary} />
               </Pressable>
             </View>
-
-            {suggestion && (
-              <View style={{ backgroundColor: Colors.surface2, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: Colors.primary + "44" }}>
-                <Text style={{ color: Colors.primary, fontSize: 12, fontWeight: "700", marginBottom: 6 }}>SUGGERIMENTO PASTO</Text>
-                <Text selectable style={{ color: Colors.textPrimary, fontSize: 14, lineHeight: 21 }}>{suggestion}</Text>
-                <Pressable onPress={() => setSuggestion(null)} style={{ alignSelf: "flex-end", marginTop: 8 }}>
-                  <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>✕ chiudi</Text>
-                </Pressable>
-              </View>
-            )}
-
-            <Text style={{ color: Colors.textSecondary, fontSize: 13, fontWeight: "700", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.6 }}>
-              Pasti di oggi
-            </Text>
           </>
         }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => setEditLog(item)}
-            onLongPress={() => deleteLog(item.id)}
-            style={({ pressed }) => ({
-              backgroundColor: Colors.surface, borderRadius: 12, padding: 14, marginBottom: 8,
-              opacity: pressed ? 0.8 : 1,
-            })}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <Text selectable style={{ color: Colors.textPrimary, fontSize: 15, marginBottom: 4, flex: 1 }}>
-                {item.meal_description}
-              </Text>
-              <Text style={{ color: Colors.textSecondary, fontSize: 12, marginLeft: 8 }}>✎</Text>
-            </View>
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>~{Math.round(item.nutrients.calories_kcal ?? 0)} kcal</Text>
-              <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>P {Math.round(item.nutrients.protein_g ?? 0)}g</Text>
-              <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>C {Math.round(item.nutrients.carbs_g ?? 0)}g</Text>
-              <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>F {Math.round(item.nutrients.fat_g ?? 0)}g</Text>
-            </View>
-            <Text style={{ color: Colors.textSecondary, fontSize: 11, marginTop: 4 }}>
-              {new Date(item.created_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
-            </Text>
+        scrollEnabled={logsOpen}
+        scrollEventThrottle={16}
+        renderItem={({ item }) => logsOpen ? (
+          <Pressable onPress={() => setEditLog(item)} onLongPress={() => deleteLog(item.id)}>
+            <GlassCard style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.textPrimary, fontSize: 18, lineHeight: 25, fontFamily: Fonts.bodyMedium }}>
+                    {item.meal_description}
+                  </Text>
+                  <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 10, fontFamily: Fonts.monoRegular }}>
+                    {new Date(item.created_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                </View>
+                <Pill label={`${Math.round(item.nutrients.calories_kcal ?? 0)} kcal`} tone="primary" />
+              </View>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+                <Pill label={`P ${Math.round(item.nutrients.protein_g ?? 0)}g`} tone="primary" />
+                <Pill label={`C ${Math.round(item.nutrients.carbs_g ?? 0)}g`} tone="secondary" />
+                <Pill label={`F ${Math.round(item.nutrients.fat_g ?? 0)}g`} tone="tertiary" />
+              </View>
+            </GlassCard>
           </Pressable>
-        )}
+        ) : null}
         ListEmptyComponent={
           !refreshing ? (
-            <Text style={{ color: Colors.textSecondary, textAlign: "center", marginTop: 20 }}>Nessun pasto loggato oggi</Text>
+            <GlassCard accent>
+              <Text style={{ color: Colors.textPrimary, fontSize: 24, fontFamily: Fonts.headlineBold, marginBottom: 10 }}>
+                Nessun pasto loggato.
+              </Text>
+              <Text style={{ color: Colors.textSecondary, fontSize: 15, lineHeight: 24, marginBottom: 16, fontFamily: Fonts.bodyRegular }}>
+                Usa la chat o il meal logger per popolare la giornata. Questa schermata è pronta a diventare il tuo cruscotto nutrizionale principale.
+              </Text>
+            </GlassCard>
           ) : null
         }
+        showsVerticalScrollIndicator={false}
       />
 
-      {editLog && (
-        <EditLogModal
-          log={editLog}
-          onClose={() => setEditLog(null)}
-          onSave={saveEdit}
-        />
-      )}
-    </View>
+      {editLog ? <EditLogModal log={editLog} onClose={() => setEditLog(null)} onSave={saveEdit} /> : null}
+    </ScreenShell>
   );
 }

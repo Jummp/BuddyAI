@@ -127,6 +127,34 @@ async def get_block_exercises(block: str) -> list[dict]:
     return result.data
 
 
+async def create_training_exercise(fields: dict) -> dict:
+    result = await asyncio.to_thread(
+        lambda: supabase.table("training_exercises")
+            .insert(fields)
+            .execute()
+    )
+    return result.data[0] if result.data else fields
+
+
+async def update_training_exercise(exercise_id: str, fields: dict) -> dict:
+    result = await asyncio.to_thread(
+        lambda: supabase.table("training_exercises")
+            .update(fields)
+            .eq("id", exercise_id)
+            .execute()
+    )
+    return result.data[0] if result.data else {}
+
+
+async def delete_training_exercise(exercise_id: str) -> None:
+    await asyncio.to_thread(
+        lambda: supabase.table("training_exercises")
+            .delete()
+            .eq("id", exercise_id)
+            .execute()
+    )
+
+
 async def get_video_link(exercise_name: str) -> dict | None:
     """Cerca in training_links un link per l'esercizio. Case-insensitive."""
     result = await asyncio.to_thread(

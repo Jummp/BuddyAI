@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Colors } from "../constants/colors";
+import { Fonts } from "../constants/typography";
+import { GlassCard, Pill } from "./ui";
 
 export type Period = "day" | "week" | "month";
 
@@ -55,28 +57,47 @@ export default function WeekStrip({
   const monthLabel = weekStart.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
 
   return (
-    <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+    <GlassCard style={{ marginBottom: 12 }}>
       {/* Month + nav arrows */}
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <Pressable
           onPress={() => setWeekOffset((o) => o - 1)}
-          style={{ padding: 6 }}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: Colors.surface3,
+            borderWidth: 1,
+            borderColor: Colors.ghostBorder,
+          }}
           accessibilityRole="button"
           accessibilityLabel="Settimana precedente"
         >
-          <Text style={{ color: Colors.primary, fontSize: 18 }}>‹</Text>
+          <Text style={{ color: Colors.primary, fontSize: 18, fontFamily: Fonts.headlineBold }}>‹</Text>
         </Pressable>
         <Text style={{ color: Colors.textSecondary, fontSize: 13, fontWeight: "600", textTransform: "capitalize" }}>
           {monthLabel}
         </Text>
         <Pressable
           onPress={() => setWeekOffset((o) => Math.min(o + 1, 0))}
-          style={{ padding: 6, opacity: weekOffset >= 0 ? 0.3 : 1 }}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: Colors.surface3,
+            borderWidth: 1,
+            borderColor: Colors.ghostBorder,
+            opacity: weekOffset >= 0 ? 0.3 : 1,
+          }}
           disabled={weekOffset >= 0}
           accessibilityRole="button"
           accessibilityLabel="Settimana successiva"
         >
-          <Text style={{ color: Colors.primary, fontSize: 18 }}>›</Text>
+          <Text style={{ color: Colors.primary, fontSize: 18, fontFamily: Fonts.headlineBold }}>›</Text>
         </Pressable>
       </View>
 
@@ -96,10 +117,12 @@ export default function WeekStrip({
               style={{
                 flex: 1,
                 alignItems: "center",
-                paddingVertical: 8,
+                paddingVertical: 10,
                 marginHorizontal: 2,
-                borderRadius: 10,
-                backgroundColor: isSelected ? Colors.primary : "transparent",
+                borderRadius: 14,
+                backgroundColor: isSelected ? Colors.primary : Colors.surface3,
+                borderWidth: 1,
+                borderColor: isSelected ? Colors.primary : Colors.ghostBorder,
                 opacity: isFuture ? 0.3 : 1,
               }}
               accessibilityRole="button"
@@ -107,13 +130,18 @@ export default function WeekStrip({
             >
               <Text style={{
                 color: isSelected ? Colors.black : Colors.textSecondary,
-                fontSize: 11, fontWeight: "600", marginBottom: 4,
+                fontSize: 10,
+                fontFamily: Fonts.headlineBold,
+                letterSpacing: 1.1,
+                textTransform: "uppercase",
+                marginBottom: 4,
               }}>
                 {label}
               </Text>
               <Text style={{
                 color: isSelected ? Colors.black : isToday ? Colors.primary : Colors.textPrimary,
-                fontSize: 15, fontWeight: isToday ? "700" : "500",
+                fontSize: 16,
+                fontFamily: isToday ? Fonts.headlineBold : Fonts.bodyMedium,
               }}>
                 {num}
               </Text>
@@ -131,29 +159,21 @@ export default function WeekStrip({
 
       {/* Period selector */}
       {showPeriod && onPeriodChange && (
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           {(["day", "week", "month"] as Period[]).map((p) => (
-            <Pressable
+            <View
               key={p}
-              onPress={() => onPeriodChange(p)}
-              style={{
-                backgroundColor: period === p ? Colors.primary : Colors.surface,
-                borderRadius: 999,
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-              }}
-              accessibilityRole="button"
+              accessibilityRole="none"
             >
-              <Text style={{
-                color: period === p ? Colors.black : Colors.textSecondary,
-                fontSize: 13, fontWeight: "600",
-              }}>
-                {p === "day" ? "Giorno" : p === "week" ? "Settimana" : "Mese"}
-              </Text>
-            </Pressable>
+              <Pill
+                label={p === "day" ? "Giorno" : p === "week" ? "Settimana" : "Mese"}
+                active={period === p}
+                onPress={() => onPeriodChange(p)}
+              />
+            </View>
           ))}
         </View>
       )}
-    </View>
+    </GlassCard>
   );
 }

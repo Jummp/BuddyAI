@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiGet, apiPatch, apiDelete } from "../services/api";
+import { apiGet, apiPatch, apiDelete, apiPost } from "../services/api";
 
 export type Habit = {
   id: string;
@@ -16,6 +16,7 @@ type HabitStore = {
   loading: boolean;
   error: string | null;
   fetchHabits: () => Promise<void>;
+  createHabit: (fields: Pick<Habit, "name" | "habit_type" | "unit" | "target">) => Promise<Habit>;
   updateHabit: (id: string, fields: Partial<Habit>) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
 };
@@ -37,15 +38,37 @@ export const useHabitStore = create<HabitStore>((set) => ({
     }
   },
 
+  createHabit: async (fields) => {
+    try {
+      const created = await apiPost<Habit>("/habits", fields);
+      set((s) => ({ habits: [...s.habits, created], error: null }));
+      return created;
+    } catch (e: any) {
+      set({ error: e.message });
+      throw e;
+    }
+  },
+
   updateHabit: async (id, fields) => {
-    const updated = await apiPatch<Habit>(`/habits/${id}`, fields);
-    set((s) => ({
-      habits: s.habits.map((h) => (h.id === id ? { ...h, ...updated } : h)),
-    }));
+    try {
+      const updated = await apiPatch<Habit>(`/habits/${id}`, fields);
+      set((s) => ({
+        habits: s.habits.map((h) => (h.id === id ? { ...h, ...updated } : h)),
+        error: null,
+      }));
+    } catch (e: any) {
+      set({ error: e.message });
+      throw e;
+    }
   },
 
   deleteHabit: async (id) => {
-    await apiDelete(`/habits/${id}`);
-    set((s) => ({ habits: s.habits.filter((h) => h.id !== id) }));
+    try {
+      await apiDelete(`/habits/${id}`);
+      set((s) => ({ habits: s.habits.filter((h) => h.id !== id), error: null }));
+    } catch (e: any) {
+      set({ error: e.message });
+      throw e;
+    }
   },
 }));

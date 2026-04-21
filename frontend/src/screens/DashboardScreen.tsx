@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,29 +6,32 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
+import { Fonts } from "../constants/typography";
 import { useHabitStore } from "../store/habitStore";
 import { apiGet } from "../services/api";
-import WeekStrip from "../components/WeekStrip";
 
-function isoDate(d: Date): string {
-  return d.toISOString().split("T")[0];
-}
-
-function formatDateLabel(iso: string): string {
-  const today = isoDate(new Date());
-  if (iso === today) return "Oggi";
-  const yesterday = isoDate(new Date(Date.now() - 86400000));
-  if (iso === yesterday) return "Ieri";
-  const d = new Date(iso);
-  return d.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+function isoDate(date: Date): string {
+  return date.toISOString().split("T")[0];
 }
 
 function addDays(date: Date, n: number): Date {
-  const d = new Date(date); d.setDate(d.getDate() + n); return d;
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function startOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
 }
 
 type AnalysisPeriod = "week" | "2weeks" | "month" | "2months";
@@ -47,59 +50,6 @@ const PERIOD_DAYS: Record<AnalysisPeriod, number> = {
   "2months": 60,
 };
 
-function StatBox({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <View style={{
-      flex: 1,
-      backgroundColor: Colors.surface2,
-      borderRadius: 12,
-      padding: 10,
-      alignItems: "center",
-    }}>
-      <Text style={{ color: Colors.textSecondary, fontSize: 11, marginBottom: 2 }}>{label}</Text>
-      <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: "700" }}>{value}</Text>
-      {sub ? <Text style={{ color: Colors.textSecondary, fontSize: 11, marginTop: 1 }}>{sub}</Text> : null}
-    </View>
-  );
-}
-
-function MiniBar({ pct, color }: { pct: number; color: string }) {
-  const clamped = Math.min(pct, 1);
-  return (
-    <View style={{ height: 4, backgroundColor: Colors.surface2, borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
-      <View style={{ width: `${Math.round(clamped * 100)}%`, height: 4, backgroundColor: color, borderRadius: 2 }} />
-    </View>
-  );
-}
-
-function HabitChip({ habit }: { habit: any }) {
-  const pct = habit.target > 0 ? habit.weekly_total / habit.target : 0;
-  let color = Colors.accent;
-  let label = `${Math.round(pct * 100)}%`;
-
-  if (habit.habit_type === "limit") {
-    if (pct > 1) { color = Colors.error; label = "SUPERATO"; }
-    else if (pct > 0.7) { color = Colors.warning; label = "ATTENZIONE"; }
-    else { color = Colors.accent; }
-  } else {
-    if (pct < 0.6) { color = Colors.textSecondary; label = "BASSO"; }
-  }
-
-  return (
-    <View style={{
-      backgroundColor: Colors.surface,
-      borderRadius: 12, padding: 12, marginRight: 8, minWidth: 90,
-      borderWidth: 1, borderColor: color, alignItems: "center",
-    }}>
-      <Text style={{ color: Colors.textPrimary, fontWeight: "600", fontSize: 13 }}>{habit.name}</Text>
-      <Text style={{ color, fontSize: 12, marginTop: 4 }}>{label}</Text>
-      <Text style={{ color: Colors.textSecondary, fontSize: 11 }}>
-        {habit.weekly_total}/{habit.target}{habit.unit}
-      </Text>
-    </View>
-  );
-}
-
 type NutritionStats = {
   avgKcal: number;
   avgProt: number;
@@ -114,6 +64,64 @@ type TrainingStats = {
   totalDays: number;
 };
 
+function SurfaceCard({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: object;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: Colors.surface,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: Colors.ghostBorder,
+        padding: 18,
+        shadowColor: Colors.primary,
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 0 },
+        ...style,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+function StatTile({
+  eyebrow,
+  title,
+  value,
+  accentColor,
+  progress,
+}: {
+  eyebrow: string;
+  title: string;
+  value: string;
+  accentColor: string;
+  progress: number;
+}) {
+  return (
+    <SurfaceCard style={{ flex: 1, backgroundColor: Colors.surface3 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 14 }}>
+        <Text style={{ color: Colors.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" }}>
+          {eyebrow}
+        </Text>
+        <Text style={{ color: accentColor, fontSize: 12, fontFamily: Fonts.monoMedium }}>{value}</Text>
+      </View>
+      <Text style={{ color: Colors.textPrimary, fontSize: 22, fontFamily: Fonts.headlineBold, marginBottom: 18 }}>
+        {title}
+      </Text>
+      <View style={{ height: 4, borderRadius: 99, backgroundColor: Colors.surface2, overflow: "hidden" }}>
+        <View style={{ width: `${Math.max(0, Math.min(progress, 1)) * 100}%`, height: 4, backgroundColor: accentColor }} />
+      </View>
+    </SurfaceCard>
+  );
+}
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -125,292 +133,417 @@ export default function DashboardScreen() {
   const [nutritionToday, setNutritionToday] = useState<any>(null);
   const [activeDates, setActiveDates] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Analysis state
   const [analysisPeriod, setAnalysisPeriod] = useState<AnalysisPeriod>("week");
   const [nutritionStats, setNutritionStats] = useState<NutritionStats | null>(null);
   const [trainingStats, setTrainingStats] = useState<TrainingStats | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
 
+  const weekDays = useMemo(() => {
+    const monday = startOfWeek(new Date());
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = addDays(monday, index);
+      return {
+        iso: isoDate(date),
+        label: date.toLocaleDateString("it-IT", { weekday: "short" }).slice(0, 3).toUpperCase(),
+        num: date.getDate(),
+      };
+    });
+  }, []);
+
   const loadForDate = useCallback(async (date: string) => {
     try {
-      const [t, logs] = await Promise.all([
+      const [training, logs] = await Promise.all([
         apiGet<{ completed: boolean }>(`/training/status?date=${date}`),
         apiGet<any[]>(`/nutrition/logs?date_from=${date}&date_to=${date}`),
       ]);
-      setTrainingCompleted(t.completed);
+      setTrainingCompleted(training.completed);
       if (logs.length > 0) {
-        const kcal = Math.round(logs.reduce((s, l) => s + (l.nutrients?.calories_kcal ?? 0), 0));
-        const prot = Math.round(logs.reduce((s, l) => s + (l.nutrients?.protein_g ?? 0), 0));
-        const carbs = Math.round(logs.reduce((s, l) => s + (l.nutrients?.carbs_g ?? 0), 0));
-        const fat = Math.round(logs.reduce((s, l) => s + (l.nutrients?.fat_g ?? 0), 0));
+        const kcal = Math.round(logs.reduce((sum, log) => sum + (log.nutrients?.calories_kcal ?? 0), 0));
+        const prot = Math.round(logs.reduce((sum, log) => sum + (log.nutrients?.protein_g ?? 0), 0));
+        const carbs = Math.round(logs.reduce((sum, log) => sum + (log.nutrients?.carbs_g ?? 0), 0));
+        const fat = Math.round(logs.reduce((sum, log) => sum + (log.nutrients?.fat_g ?? 0), 0));
         setNutritionToday({ kcal, prot, carbs, fat });
       } else {
         setNutritionToday(null);
       }
-    } catch {}
+    } catch {
+      setNutritionToday(null);
+      setTrainingCompleted(false);
+    }
   }, []);
 
   const loadActiveDates = useCallback(async () => {
-    const from = isoDate(new Date(Date.now() - 30 * 86400000));
+    const from = isoDate(addDays(new Date(), -30));
     try {
       const logs = await apiGet<any[]>(`/nutrition/logs?date_from=${from}&date_to=${todayStr}`);
-      const dates = Array.from(new Set(logs.map((l: any) => l.date)));
-      setActiveDates(dates);
-    } catch {}
-  }, []);
+      setActiveDates(Array.from(new Set(logs.map((log: any) => log.date))));
+    } catch {
+      setActiveDates([]);
+    }
+  }, [todayStr]);
 
   const loadAnalysis = useCallback(async (period: AnalysisPeriod) => {
     setAnalysisLoading(true);
     const days = PERIOD_DAYS[period];
     const from = isoDate(addDays(new Date(), -days + 1));
-    const to = todayStr;
     try {
-      const [nutLogs, trainLogs] = await Promise.all([
-        apiGet<any[]>(`/nutrition/logs?date_from=${from}&date_to=${to}`),
-        apiGet<any[]>(`/training/logs?date_from=${from}&date_to=${to}`),
+      const [nutritionLogs, trainingLogs] = await Promise.all([
+        apiGet<any[]>(`/nutrition/logs?date_from=${from}&date_to=${todayStr}`),
+        apiGet<any[]>(`/training/logs?date_from=${from}&date_to=${todayStr}`),
       ]);
 
-      // Nutrition stats — group by day, then average
-      const byDay: Record<string, { kcal: number; prot: number; carbs: number; fat: number }> = {};
-      for (const l of nutLogs) {
-        const day = l.date;
-        if (!byDay[day]) byDay[day] = { kcal: 0, prot: 0, carbs: 0, fat: 0 };
-        byDay[day].kcal += l.nutrients?.calories_kcal ?? 0;
-        byDay[day].prot += l.nutrients?.protein_g ?? 0;
-        byDay[day].carbs += l.nutrients?.carbs_g ?? 0;
-        byDay[day].fat += l.nutrients?.fat_g ?? 0;
+      const grouped: Record<string, { kcal: number; prot: number; carbs: number; fat: number }> = {};
+      for (const log of nutritionLogs) {
+        const day = log.date;
+        if (!grouped[day]) grouped[day] = { kcal: 0, prot: 0, carbs: 0, fat: 0 };
+        grouped[day].kcal += log.nutrients?.calories_kcal ?? 0;
+        grouped[day].prot += log.nutrients?.protein_g ?? 0;
+        grouped[day].carbs += log.nutrients?.carbs_g ?? 0;
+        grouped[day].fat += log.nutrients?.fat_g ?? 0;
       }
-      const loggedDays = Object.values(byDay);
-      const daysLogged = loggedDays.length;
-      const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+      const loggedDays = Object.values(grouped);
+      const avg = (values: number[]) => (values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 0);
       setNutritionStats({
-        avgKcal: avg(loggedDays.map((d) => d.kcal)),
-        avgProt: avg(loggedDays.map((d) => d.prot)),
-        avgCarbs: avg(loggedDays.map((d) => d.carbs)),
-        avgFat: avg(loggedDays.map((d) => d.fat)),
-        daysLogged,
+        avgKcal: avg(loggedDays.map((item) => item.kcal)),
+        avgProt: avg(loggedDays.map((item) => item.prot)),
+        avgCarbs: avg(loggedDays.map((item) => item.carbs)),
+        avgFat: avg(loggedDays.map((item) => item.fat)),
+        daysLogged: loggedDays.length,
         totalDays: days,
       });
 
-      // Training stats
-      const completed = trainLogs.filter((l) => l.completed).length;
-      setTrainingStats({ daysCompleted: completed, totalDays: days });
+      setTrainingStats({
+        daysCompleted: trainingLogs.filter((log) => log.completed).length,
+        totalDays: days,
+      });
     } catch {
       setNutritionStats(null);
       setTrainingStats(null);
     } finally {
       setAnalysisLoading(false);
     }
-  }, []);
+  }, [todayStr]);
 
   const load = useCallback(async () => {
     await Promise.all([fetchHabits(), loadForDate(selectedDate), loadActiveDates(), loadAnalysis(analysisPeriod)]);
-  }, [selectedDate, analysisPeriod]);
+  }, [analysisPeriod, fetchHabits, loadActiveDates, loadAnalysis, loadForDate, selectedDate]);
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { loadForDate(selectedDate); }, [selectedDate]);
-  useEffect(() => { loadAnalysis(analysisPeriod); }, [analysisPeriod]);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  useEffect(() => {
+    loadForDate(selectedDate);
+  }, [loadForDate, selectedDate]);
 
-  const oggi = new Date();
-  const GIORNI = ["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"];
-  const MESI = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  useEffect(() => {
+    loadAnalysis(analysisPeriod);
+  }, [analysisPeriod, loadAnalysis]);
 
-  const trainPct = trainingStats ? trainingStats.daysCompleted / trainingStats.totalDays : 0;
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  const primaryHabit = habits[0];
+  const habitProgress = primaryHabit && primaryHabit.target > 0 ? primaryHabit.weekly_total / primaryHabit.target : 0;
+  const trainingRatio = trainingStats ? trainingStats.daysCompleted / Math.max(trainingStats.totalDays, 1) : trainingCompleted ? 1 : 0;
+  const nutritionRatio = nutritionToday ? Math.min(nutritionToday.kcal / 2400, 1) : nutritionStats ? Math.min(nutritionStats.avgKcal / 2400, 1) : 0;
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: Colors.black }}
-      contentContainerStyle={{ paddingBottom: 32 }}
+      style={{ flex: 1, backgroundColor: Colors.background }}
+      contentContainerStyle={{
+        paddingBottom: 32,
+        width: "100%",
+        maxWidth: Platform.OS === "web" ? 900 : undefined,
+        alignSelf: "center",
+      }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
     >
-      {/* Header */}
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: 16 }}>
-        <Text style={{ color: Colors.textPrimary, fontSize: 24, fontWeight: "700" }}>
-          Buongiorno, Jump
-        </Text>
-        <Text style={{ color: Colors.textSecondary, fontSize: 14, marginTop: 2 }}>
-          {GIORNI[oggi.getDay()]} {oggi.getDate()} {MESI[oggi.getMonth()]}
-        </Text>
-      </View>
-
-      {/* Week strip */}
-      <WeekStrip
-        selectedDate={selectedDate}
-        activeDates={activeDates}
-        onSelectDate={setSelectedDate}
-        showPeriod={false}
-      />
-
-      {/* Date label */}
-      {selectedDate !== todayStr && (
-        <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
-          <Text style={{ color: Colors.primary, fontSize: 14, fontWeight: "600" }}>
-            {formatDateLabel(selectedDate)}
+      <View style={{ paddingTop: insets.top + 18, paddingHorizontal: 20, paddingBottom: 18 }}>
+        <View
+          style={{
+            alignSelf: "flex-start",
+            backgroundColor: Colors.surface3,
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: Colors.ghostBorder,
+          }}
+        >
+          <Text style={{ color: Colors.primary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.6, textTransform: "uppercase" }}>
+            System Status: Optimal
           </Text>
         </View>
-      )}
-
-      {/* Training card */}
-      <Pressable
-        onPress={() => navigation.navigate("TrainingDetail")}
-        style={({ pressed }) => ({
-          marginHorizontal: 20,
-          backgroundColor: Colors.surface,
-          borderRadius: 16, padding: 16, marginBottom: 16,
-          borderWidth: 1,
-          borderColor: trainingCompleted ? Colors.accent : Colors.primary,
-          opacity: pressed ? 0.8 : 1,
-        })}
-        accessibilityRole="button"
-      >
-        <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 4 }}>
-          🏋 Allenamento {formatDateLabel(selectedDate).toLowerCase()}
+        <Text style={{ color: Colors.textPrimary, fontSize: 44, lineHeight: 46, fontFamily: Fonts.headlineBold }}>
+          Good morning,{"\n"}
+          <Text style={{ color: Colors.primaryDark, fontFamily: Fonts.headlineBold }}>Jump.</Text>
         </Text>
-        <Text style={{ color: Colors.textPrimary, fontSize: 18, fontWeight: "600" }}>
-          {trainingCompleted ? "✓ Completato" : "Apri il blocco →"}
+        <Text style={{ color: Colors.textSecondary, fontSize: 17, lineHeight: 25, marginTop: 12, maxWidth: 420, fontFamily: Fonts.bodyRegular }}>
+          Hai allenamento, log nutrizione e consistenza habits sotto controllo. Usa il pannello qui sotto per entrare in azione.
         </Text>
-      </Pressable>
-
-      {/* Habits */}
-      <View style={{ marginBottom: 20 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, marginBottom: 10 }}>
-          <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: "600" }}>Habit settimana</Text>
-          <Pressable onPress={() => navigation.navigate("HabitList")} accessibilityRole="button">
-            <Text style={{ color: Colors.primary, fontSize: 14 }}>Vedi tutte →</Text>
-          </Pressable>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
-          {habits.length === 0
-            ? <Text style={{ color: Colors.textSecondary }}>Nessuna habit configurata</Text>
-            : habits.map((h) => <HabitChip key={h.id} habit={h} />)
-          }
-        </ScrollView>
       </View>
 
-      {/* Nutrition */}
-      <Pressable
-        onPress={() => navigation.navigate("Nutrition")}
-        style={({ pressed }) => ({
-          marginHorizontal: 20,
-          backgroundColor: Colors.surface,
-          borderRadius: 16, padding: 16,
-          opacity: pressed ? 0.8 : 1,
-        })}
-        accessibilityRole="button"
-      >
-        <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 8 }}>
-          🥗 Nutrizione {formatDateLabel(selectedDate).toLowerCase()}
-        </Text>
-        {nutritionToday ? (
-          <>
-            <Text style={{ color: Colors.textPrimary, fontSize: 18, fontWeight: "700", marginBottom: 8 }}>
-              {nutritionToday.kcal} kcal
-            </Text>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              {[
-                { label: "Proteine", val: nutritionToday.prot, unit: "g" },
-                { label: "Carbs", val: nutritionToday.carbs, unit: "g" },
-                { label: "Grassi", val: nutritionToday.fat, unit: "g" },
-              ].map(({ label, val, unit }) => (
-                <View key={label} style={{ flex: 1, backgroundColor: Colors.surface2, borderRadius: 10, padding: 8, alignItems: "center" }}>
-                  <Text style={{ color: Colors.textSecondary, fontSize: 11 }}>{label}</Text>
-                  <Text style={{ color: Colors.textPrimary, fontSize: 14, fontWeight: "700" }}>{val}{unit}</Text>
-                </View>
-              ))}
+      <View style={{ paddingHorizontal: 20, marginBottom: 20, gap: 14 }}>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <Pressable onPress={() => navigation.navigate("Nutrition")} style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.7 : 1 })}>
+            <View style={{ backgroundColor: Colors.surface3, borderRadius: 14, borderWidth: 1, borderColor: Colors.ghostBorder, paddingVertical: 16, paddingHorizontal: 16, alignItems: "center", shadowColor: Colors.secondary, shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } }}>
+              <MaterialIcons name="restaurant" size={28} color={Colors.secondary} />
+              <Text style={{ color: Colors.textPrimary, fontSize: 12, fontFamily: Fonts.headlineBold, marginTop: 8, letterSpacing: 1.1, textTransform: "uppercase" }}>Nutrition</Text>
             </View>
-          </>
-        ) : (
-          <Text style={{ color: Colors.textSecondary }}>Nessun pasto loggato</Text>
-        )}
-      </Pressable>
-
-      {/* ── ANALISI ── */}
-      <View style={{ marginHorizontal: 20, marginTop: 24 }}>
-        <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: "700", marginBottom: 12 }}>
-          Analisi periodo
-        </Text>
-
-        {/* Period pills */}
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-          {(Object.keys(PERIOD_LABELS) as AnalysisPeriod[]).map((p) => (
-            <Pressable
-              key={p}
-              onPress={() => setAnalysisPeriod(p)}
-              style={{
-                backgroundColor: analysisPeriod === p ? Colors.primary : Colors.surface,
-                borderRadius: 999,
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-              }}
-              accessibilityRole="button"
-            >
-              <Text style={{
-                color: analysisPeriod === p ? Colors.black : Colors.textSecondary,
-                fontSize: 13, fontWeight: "600",
-              }}>
-                {PERIOD_LABELS[p]}
-              </Text>
-            </Pressable>
-          ))}
+          </Pressable>
+          <Pressable onPress={() => navigation.navigate("HabitList")} style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.7 : 1 })}>
+            <View style={{ backgroundColor: Colors.surface3, borderRadius: 14, borderWidth: 1, borderColor: Colors.ghostBorder, paddingVertical: 16, paddingHorizontal: 16, alignItems: "center", shadowColor: Colors.primary, shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } }}>
+              <MaterialIcons name="track-changes" size={28} color={Colors.primary} />
+              <Text style={{ color: Colors.textPrimary, fontSize: 12, fontFamily: Fonts.headlineBold, marginTop: 8, letterSpacing: 1.1, textTransform: "uppercase" }}>Habits</Text>
+            </View>
+          </Pressable>
+          <Pressable onPress={() => navigation.navigate("TrainingDetail")} style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.7 : 1 })}>
+            <View style={{ backgroundColor: Colors.surface3, borderRadius: 14, borderWidth: 1, borderColor: Colors.ghostBorder, paddingVertical: 16, paddingHorizontal: 16, alignItems: "center", shadowColor: Colors.tertiary, shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } }}>
+              <MaterialIcons name="fitness-center" size={28} color={Colors.tertiary} />
+              <Text style={{ color: Colors.textPrimary, fontSize: 12, fontFamily: Fonts.headlineBold, marginTop: 8, letterSpacing: 1.1, textTransform: "uppercase" }}>Training</Text>
+            </View>
+          </Pressable>
         </View>
 
-        {analysisLoading ? (
-          <ActivityIndicator color={Colors.primary} style={{ marginTop: 16 }} />
-        ) : (
-          <>
-            {/* Allenamento recap */}
-            <View style={{ backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 12 }}>
-              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 10 }}>🏋 Allenamento</Text>
-              {trainingStats ? (
-                <>
-                  <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                    <Text style={{ color: Colors.textPrimary, fontSize: 28, fontWeight: "800" }}>
-                      {trainingStats.daysCompleted}
-                    </Text>
-                    <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>
-                      / {trainingStats.totalDays} giorni
-                    </Text>
-                    <Text style={{ color: trainPct >= 0.7 ? Colors.accent : trainPct >= 0.4 ? Colors.warning : Colors.error, fontSize: 14, fontWeight: "700", marginLeft: "auto" }}>
-                      {Math.round(trainPct * 100)}%
-                    </Text>
-                  </View>
-                  <MiniBar pct={trainPct} color={trainPct >= 0.7 ? Colors.accent : trainPct >= 0.4 ? Colors.warning : Colors.error} />
-                </>
-              ) : (
-                <Text style={{ color: Colors.textSecondary }}>Nessun dato</Text>
-              )}
-            </View>
-
-            {/* Nutrizione recap */}
-            <View style={{ backgroundColor: Colors.surface, borderRadius: 16, padding: 16 }}>
-              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 10 }}>
-                🥗 Nutrizione media/giorno
-                {nutritionStats ? (
-                  <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>
-                    {" "}({nutritionStats.daysLogged}/{nutritionStats.totalDays} giorni loggati)
-                  </Text>
-                ) : null}
+        <SurfaceCard>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <View>
+              <Text style={{ color: Colors.textPrimary, fontSize: 22, fontFamily: Fonts.headlineBold }}>Consistency Grid</Text>
+              <Text style={{ color: Colors.textSecondary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase", marginTop: 3 }}>
+                7-Day Performance Metrics
               </Text>
-              {nutritionStats && nutritionStats.daysLogged > 0 ? (
-                <>
-                  <Text style={{ color: Colors.textPrimary, fontSize: 28, fontWeight: "800", marginBottom: 10 }}>
-                    {nutritionStats.avgKcal} <Text style={{ fontSize: 14, fontWeight: "400", color: Colors.textSecondary }}>kcal</Text>
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    <StatBox label="Proteine" value={`${nutritionStats.avgProt}g`} />
-                    <StatBox label="Carbs" value={`${nutritionStats.avgCarbs}g`} />
-                    <StatBox label="Grassi" value={`${nutritionStats.avgFat}g`} />
-                  </View>
-                </>
-              ) : (
-                <Text style={{ color: Colors.textSecondary }}>Nessun dato nel periodo</Text>
-              )}
             </View>
-          </>
-        )}
+            <Text style={{ color: Colors.textMuted, fontSize: 12, fontFamily: Fonts.monoRegular }}>{selectedDate === todayStr ? "oggi" : selectedDate}</Text>
+          </View>
+
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            {weekDays.map((day) => {
+              const isSelected = day.iso === selectedDate;
+              const hasData = activeDates.includes(day.iso) || day.iso === todayStr;
+              return (
+                <Pressable key={day.iso} onPress={() => setSelectedDate(day.iso)} style={{ alignItems: "center", flex: 1 }}>
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 10,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: isSelected ? Colors.primary : hasData ? "rgba(161,255,194,0.16)" : Colors.surface3,
+                      borderWidth: 1,
+                      borderColor: isSelected ? Colors.primary : "rgba(161,255,194,0.10)",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text style={{ color: isSelected ? Colors.textPrimaryOnAccent : hasData ? Colors.primary : Colors.textMuted, fontWeight: "700" }}>
+                      {hasData ? (isSelected ? "⚡" : "✓") : ""}
+                    </Text>
+                  </View>
+                  <Text style={{ color: isSelected ? Colors.primary : Colors.textSecondary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.1, textTransform: "uppercase" }}>
+                    {day.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </SurfaceCard>
+      </View>
+
+      <View style={{ paddingHorizontal: 20, gap: 18 }}>
+        <Pressable onPress={() => navigation.navigate("TrainingDetail")}>
+          <SurfaceCard style={{ padding: 22, borderLeftWidth: 2, borderLeftColor: Colors.primary, overflow: "hidden" }}>
+            <View style={{ position: "absolute", right: 12, top: 18, opacity: 0.12 }}>
+              <MaterialIcons name="fitness-center" size={120} color={Colors.primary} />
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+              <View style={{ backgroundColor: Colors.surface3, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, marginRight: 10 }}>
+                <Text style={{ color: Colors.tertiary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase" }}>
+                  Today's Block
+                </Text>
+              </View>
+              <Text style={{ color: Colors.textMuted, fontSize: 12, fontFamily: Fonts.monoRegular }}>08:00 — 09:30</Text>
+            </View>
+            <Text style={{ color: Colors.textPrimary, fontSize: 34, lineHeight: 36, fontFamily: Fonts.headlineBold, maxWidth: "82%", marginBottom: 12 }}>
+              {trainingCompleted ? "Sessione completata" : "Neural Strength Induction"}
+            </Text>
+            <Text style={{ color: Colors.textSecondary, fontSize: 16, lineHeight: 24, maxWidth: "84%", marginBottom: 22, fontFamily: Fonts.bodyRegular }}>
+              {trainingCompleted
+                ? "Hai già chiuso il blocco selezionato. Puoi rientrare per rivedere gli esercizi o modificare il piano."
+                : "Focusing on posterior chain, video cues e correzioni manuali. Apri la sessione e lavora sul blocco attivo."}
+            </Text>
+            <View
+              style={{
+                alignSelf: "flex-start",
+                backgroundColor: Colors.primary,
+                borderRadius: 10,
+                paddingHorizontal: 18,
+                paddingVertical: 14,
+                shadowColor: Colors.primary,
+                shadowOpacity: 0.22,
+                shadowRadius: 16,
+                shadowOffset: { width: 0, height: 0 },
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Text style={{ color: Colors.textPrimaryOnAccent, fontSize: 13, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase" }}>
+                {trainingCompleted ? "Review Session" : "Start Session"}
+              </Text>
+              <MaterialIcons name="play-arrow" size={18} color={Colors.textPrimaryOnAccent} />
+            </View>
+          </SurfaceCard>
+        </Pressable>
+
+        <SurfaceCard>
+          <View style={{ marginBottom: 14 }}>
+            <Text style={{ color: Colors.textPrimary, fontSize: 18, fontFamily: Fonts.headlineBold }}>Active Habits</Text>
+            <Text style={{ color: Colors.textSecondary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase", marginTop: 2 }}>
+              Progress & Tracking
+            </Text>
+          </View>
+          {habits.length === 0 ? (
+            <Text style={{ color: Colors.textMuted, fontSize: 14, fontFamily: Fonts.bodyRegular, textAlign: "center", paddingVertical: 12 }}>
+              No habits yet. Create one in Habits area.
+            </Text>
+          ) : (
+            <View style={{ gap: 12 }}>
+              {habits.map((habit) => {
+                const progress = habit.target > 0 ? habit.weekly_total / habit.target : 0;
+                return (
+                  <Pressable key={habit.id} onPress={() => navigation.navigate("HabitDetail", { id: habit.id })}>
+                    <View style={{ backgroundColor: Colors.surface3, borderRadius: 12, padding: 12 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: Colors.textPrimary, fontSize: 15, fontFamily: Fonts.bodyMedium }}>
+                            {habit.name}
+                          </Text>
+                          <Text style={{ color: Colors.textMuted, fontSize: 11, fontFamily: Fonts.monoRegular, marginTop: 2 }}>
+                            {habit.habit_type === "habit" ? "↑" : "↓"} {habit.weekly_total}/{habit.target} {habit.unit}
+                          </Text>
+                        </View>
+                        <Text style={{ color: Colors.primary, fontSize: 13, fontFamily: Fonts.headlineBold }}>
+                          {Math.round(progress * 100)}%
+                        </Text>
+                      </View>
+                      <View style={{ height: 4, borderRadius: 99, backgroundColor: Colors.surface2, overflow: "hidden" }}>
+                        <View style={{ width: `${Math.max(0, Math.min(progress, 1)) * 100}%`, height: 4, backgroundColor: Colors.primary }} />
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </SurfaceCard>
+
+        <Pressable onPress={() => navigation.navigate("Nutrition")}>
+          <StatTile
+            eyebrow="Nutrition"
+            title={nutritionToday ? `${nutritionToday.kcal} kcal` : nutritionStats ? `${nutritionStats.avgKcal} kcal` : "No logs"}
+            value={nutritionToday ? `${nutritionToday.prot}g prot` : nutritionStats ? `${nutritionStats.daysLogged}/${nutritionStats.totalDays} d` : "--"}
+            accentColor={Colors.secondary}
+            progress={nutritionRatio}
+          />
+        </Pressable>
+
+        <Pressable onPress={() => navigation.getParent()?.navigate("Journal")}>
+          <SurfaceCard style={{ backgroundColor: Colors.surface3, flexDirection: "row", alignItems: "center" }}>
+            <View
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 14,
+                backgroundColor: "rgba(110,155,255,0.14)",
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: 14,
+              }}
+            >
+              <Text style={{ color: Colors.tertiary, fontSize: 24 }}>✦</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: Colors.textPrimary, fontSize: 20, fontFamily: Fonts.headlineBold, marginBottom: 4 }}>Daily Journaling</Text>
+              <Text style={{ color: Colors.textSecondary, fontSize: 14, lineHeight: 20, fontFamily: Fonts.bodyRegular }}>
+                Apri il journal e lascia una memoria veloce, oppure rivedi tag e summary del giorno.
+              </Text>
+            </View>
+            <Text style={{ color: Colors.tertiary, fontSize: 24 }}>→</Text>
+          </SurfaceCard>
+        </Pressable>
+
+        <SurfaceCard>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <Text style={{ color: Colors.textPrimary, fontSize: 18, fontFamily: Fonts.headlineBold }}>Analysis Window</Text>
+            <Text style={{ color: Colors.textMuted, fontSize: 11, letterSpacing: 1.1, textTransform: "uppercase", fontFamily: Fonts.monoRegular }}>
+              Live Metrics
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+            {(Object.keys(PERIOD_LABELS) as AnalysisPeriod[]).map((period) => (
+              <Pressable
+                key={period}
+                onPress={() => setAnalysisPeriod(period)}
+                style={{
+                  backgroundColor: analysisPeriod === period ? Colors.primary : Colors.surface3,
+                  borderRadius: 999,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: analysisPeriod === period ? Colors.textPrimaryOnAccent : Colors.textSecondary,
+                    fontSize: 12,
+                    fontFamily: Fonts.headlineBold,
+                  }}
+                >
+                  {PERIOD_LABELS[period]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {analysisLoading ? (
+            <ActivityIndicator color={Colors.primary} style={{ marginVertical: 20 }} />
+          ) : (
+            <View style={{ gap: 12 }}>
+              <View style={{ backgroundColor: Colors.surface3, borderRadius: 14, padding: 14 }}>
+                <Text style={{ color: Colors.textSecondary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>
+                  Training
+                </Text>
+                <Text style={{ color: Colors.textPrimary, fontSize: 28, fontFamily: Fonts.headlineBold }}>
+                  {trainingStats ? `${trainingStats.daysCompleted}/${trainingStats.totalDays}` : trainingCompleted ? "1/1" : "0/1"}
+                </Text>
+                <Text style={{ color: Colors.textSecondary, fontSize: 14, marginTop: 2, fontFamily: Fonts.bodyRegular }}>giorni completati nel periodo</Text>
+                <View style={{ height: 4, borderRadius: 99, backgroundColor: Colors.surface2, marginTop: 12, overflow: "hidden" }}>
+                  <View style={{ width: `${trainingRatio * 100}%`, height: 4, backgroundColor: Colors.primary }} />
+                </View>
+              </View>
+
+              <View style={{ backgroundColor: Colors.surface3, borderRadius: 14, padding: 14 }}>
+                <Text style={{ color: Colors.textSecondary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>
+                  Nutrition
+                </Text>
+                <Text style={{ color: Colors.textPrimary, fontSize: 28, fontFamily: Fonts.headlineBold }}>
+                  {nutritionStats ? `${nutritionStats.avgKcal} kcal` : nutritionToday ? `${nutritionToday.kcal} kcal` : "0 kcal"}
+                </Text>
+                <Text style={{ color: Colors.textSecondary, fontSize: 14, marginTop: 2, fontFamily: Fonts.bodyRegular }}>
+                  {nutritionStats ? `${nutritionStats.daysLogged}/${nutritionStats.totalDays} giorni loggati` : "nessun log nel periodo"}
+                </Text>
+                <View style={{ height: 4, borderRadius: 99, backgroundColor: Colors.surface2, marginTop: 12, overflow: "hidden" }}>
+                  <View style={{ width: `${nutritionRatio * 100}%`, height: 4, backgroundColor: Colors.secondary }} />
+                </View>
+              </View>
+            </View>
+          )}
+        </SurfaceCard>
       </View>
     </ScrollView>
   );

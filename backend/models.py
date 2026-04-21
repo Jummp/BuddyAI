@@ -4,6 +4,7 @@ from datetime import datetime
 
 class ChatRequest(BaseModel):
     text: str
+    client_message_id: str | None = None
 
 
 class IntentResult(BaseModel):

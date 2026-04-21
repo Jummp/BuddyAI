@@ -1,106 +1,128 @@
 import React, { useEffect } from "react";
-import { View, Text, FlatList, Pressable, Alert, RefreshControl } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { Alert, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
-import { useHabitStore, Habit } from "../store/habitStore";
+import { Fonts } from "../constants/typography";
+import { Habit, useHabitStore } from "../store/habitStore";
+import { GlassCard, Pill, ScreenHeader, ScreenShell } from "../components/ui";
 
-function HabitRow({ habit, onDelete, onPress }: { habit: Habit; onDelete: () => void; onPress: () => void }) {
+function HabitRow({
+  habit,
+  onDelete,
+  onPress,
+}: {
+  habit: Habit;
+  onDelete: () => void;
+  onPress: () => void;
+}) {
   const pct = habit.target > 0 ? habit.weekly_total / habit.target : 0;
-  let statusColor = Colors.accent;
-  let statusLabel = `${Math.round(pct * 100)}%`;
-
-  if (habit.habit_type === "limit") {
-    if (pct > 1) { statusColor = Colors.error; statusLabel = "SUPERATO"; }
-    else if (pct > 0.7) { statusColor = Colors.warning; statusLabel = "ATTENZIONE"; }
-  } else {
-    if (pct < 0.6) { statusColor = Colors.textSecondary; statusLabel = "BASSO"; }
-  }
+  const statusTone = habit.habit_type === "limit" ? (pct > 1 ? "secondary" : "tertiary") : "primary";
+  const statusLabel =
+    habit.habit_type === "limit"
+      ? pct > 1
+        ? "Exceeded"
+        : "Controlled"
+      : `${Math.round(pct * 100)}%`;
 
   return (
     <Pressable
       onPress={onPress}
-      onLongPress={() => Alert.alert("Elimina", `Eliminare "${habit.name}"?`, [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: onDelete },
-      ])}
-      style={({ pressed }) => ({
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 10,
-        opacity: pressed ? 0.8 : 1,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-      })}
-      accessibilityLabel={`${habit.name}: ${statusLabel}`}
+      onLongPress={() =>
+        Alert.alert("Elimina", `Eliminare "${habit.name}"?`, [
+          { text: "Annulla", style: "cancel" },
+          { text: "Elimina", style: "destructive", onPress: onDelete },
+        ])
+      }
     >
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: "600" }}>
-          {habit.name}
-        </Text>
-        <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 2 }}>
-          {habit.weekly_total}/{habit.target}{habit.unit} · {habit.habit_type}
-        </Text>
-        {habit.reminder_time && (
-          <Text style={{ color: Colors.primary, fontSize: 12, marginTop: 2 }}>
-            ⏰ {habit.reminder_time.slice(0, 5)}
-          </Text>
-        )}
-      </View>
-      <View style={{ backgroundColor: statusColor + "22", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-        <Text style={{ color: statusColor, fontWeight: "700", fontSize: 13 }}>{statusLabel}</Text>
-      </View>
+      <GlassCard accent style={{ marginBottom: 12 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: Colors.textPrimary, fontSize: 22, fontFamily: Fonts.headlineBold }}>{habit.name}</Text>
+            <Text style={{ color: Colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 8, fontFamily: Fonts.bodyRegular }}>
+              {habit.weekly_total}/{habit.target} {habit.unit || "unit"} · {habit.habit_type}
+            </Text>
+            {habit.reminder_time ? (
+              <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 6, fontFamily: Fonts.monoRegular }}>
+                reminder // {habit.reminder_time.slice(0, 5)}
+              </Text>
+            ) : null}
+          </View>
+          <View style={{ alignItems: "flex-end", gap: 10 }}>
+            <Pill label={statusLabel} tone={statusTone as any} />
+            <MaterialIcons name="north-east" size={18} color={Colors.textMuted} />
+          </View>
+        </View>
+        <View style={{ height: 4, borderRadius: 999, backgroundColor: Colors.surface3, overflow: "hidden", marginTop: 16 }}>
+          <View style={{ width: `${Math.max(0, Math.min(pct, 1)) * 100}%`, height: 4, backgroundColor: habit.habit_type === "limit" ? Colors.secondary : Colors.primary }} />
+        </View>
+      </GlassCard>
     </Pressable>
   );
 }
 
 export default function HabitListScreen() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { habits, loading, fetchHabits, deleteHabit } = useHabitStore();
+  const { habits, loading, error, fetchHabits, deleteHabit } = useHabitStore();
 
-  useEffect(() => { fetchHabits(); }, []);
+  useEffect(() => {
+    fetchHabits();
+  }, [fetchHabits]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchHabits();
+    }, [fetchHabits])
+  );
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.black }}>
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Pressable onPress={() => navigation.goBack()} accessibilityRole="button">
-          <Text style={{ color: Colors.primary, fontSize: 18 }}>←</Text>
-        </Pressable>
-        <Text style={{ color: Colors.textPrimary, fontSize: 22, fontWeight: "700" }}>
-          Habit & Limiti
-        </Text>
-        <Pressable
-          onPress={() => navigation.navigate("HabitDetail", {})}
-          accessibilityLabel="Nuova habit"
-          accessibilityRole="button"
-        >
-          <Text style={{ color: Colors.primary, fontSize: 22 }}>+</Text>
-        </Pressable>
-      </View>
+    <ScreenShell>
+      <ScreenHeader
+        title="Habits"
+        subtitle="Lista operativa di abitudini e limiti, con stato settimanale leggibile e accesso diretto all'editing."
+        onBack={() => navigation.goBack()}
+        right={<Pill label="+ New" tone="secondary" onPress={() => navigation.navigate("HabitDetail", {})} />}
+      />
+
+      {error ? (
+        <GlassCard style={{ marginBottom: 12 }}>
+          <Text style={{ color: Colors.error, fontFamily: Fonts.bodyMedium }}>{error}</Text>
+        </GlassCard>
+      ) : null}
 
       <FlatList
         data={habits}
-        keyExtractor={(h) => h.id}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+        keyExtractor={(habit) => habit.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchHabits} tintColor={Colors.primary} />}
+        contentContainerStyle={{ paddingBottom: 24 }}
         renderItem={({ item }) => (
           <HabitRow
             habit={item}
             onPress={() => navigation.navigate("HabitDetail", { habitId: item.id })}
-            onDelete={() => deleteHabit(item.id)}
+            onDelete={async () => {
+              try {
+                await deleteHabit(item.id);
+              } catch (e: any) {
+                Alert.alert("Errore", e.message);
+              }
+            }}
           />
         )}
         ListEmptyComponent={
           !loading ? (
-            <Text style={{ color: Colors.textSecondary, textAlign: "center", marginTop: 40 }}>
-              Nessuna habit. Aggiungila via chat o con il tasto +
-            </Text>
+            <GlassCard accent>
+              <Text style={{ color: Colors.textPrimary, fontSize: 24, fontFamily: Fonts.headlineBold, marginBottom: 10 }}>
+                Nessuna habit attiva.
+              </Text>
+              <Text style={{ color: Colors.textSecondary, fontSize: 15, lineHeight: 24, marginBottom: 14, fontFamily: Fonts.bodyRegular }}>
+                Crea la prima habit da qui e trasformiamo questa sezione in un vero pannello di controllo invece che in una lista vuota.
+              </Text>
+              <Pill label="Create Habit" active onPress={() => navigation.navigate("HabitDetail", {})} />
+            </GlassCard>
           ) : null
         }
+        showsVerticalScrollIndicator={false}
       />
-    </View>
+    </ScreenShell>
   );
 }

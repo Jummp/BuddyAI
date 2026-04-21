@@ -1,8 +1,9 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
+import { Fonts } from "../constants/typography";
 import { TabParamList, DashboardStackParamList } from "./types";
 
 import ChatScreen from "../screens/ChatScreen";
@@ -37,21 +38,36 @@ export default function TabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.surface2,
-          borderTopColor: Colors.border,
+          backgroundColor: Colors.background,
+          borderTopColor: Colors.ghostBorder,
           borderTopWidth: 1,
+          height: 78,
+          paddingTop: 10,
+          paddingBottom: 10,
+          shadowColor: Colors.primary,
+          shadowOpacity: 0.08,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: -4 },
         },
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textSecondary,
-        tabBarIcon: ({ color, size }) => {
-          const icons: Record<keyof TabParamList, keyof typeof Ionicons.glyphMap> = {
-            Chat: "mic",
-            Dashboard: "grid-outline",
-            Journal: "book-outline",
-            Impostazioni: "settings-outline",
-          };
-          return <Ionicons name={icons[route.name]} size={size} color={color} />;
+        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarItemStyle: {
+          marginHorizontal: 4,
+          borderRadius: 10,
         },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontFamily: Fonts.headlineBold,
+          letterSpacing: 1.2,
+          textTransform: "uppercase",
+        },
+        tabBarIcon: ({ color, size }) => {
+          if (route.name === "Chat") return <MaterialIcons name="chat-bubble-outline" size={size} color={color} />;
+          if (route.name === "Dashboard") return <MaterialIcons name="dashboard" size={size} color={color} />;
+          if (route.name === "Journal") return <MaterialIcons name="auto-stories" size={size} color={color} />;
+          return <Ionicons name="settings-outline" size={size} color={color} />;
+        },
+        tabBarActiveBackgroundColor: Colors.surface,
       })}
     >
       <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: "Chat" }} />

@@ -34,6 +34,8 @@ _MEMORY_PROMPT = """Analizza il testo e restituisci SOLO un JSON valido:
 {{"summary": "riassunto in 1-2 frasi narrative in prima persona come se fosse Jump che parla (es: Ho incontrato Sofia, abbiamo parlato del clown e del freeze, si è sentita a disagio)", "tags": ["tag1", "tag2", "tag3"], "entities": {{"events": [], "people": [], "emotions": [], "topics": []}}}}
 
 REGOLE per tags: MASSIMO 3 tag flat lowercase. Scegli i più significativi tra nomi propri di persone e argomenti chiave (es: ["sofia", "amici", "clown"]). MAI usare "narratore", MAI usare tag generici come "conversazione" o "dialogo".
+Se testo è molto corto, NON scrivere che è troppo breve: usa direttamente parole originali come summary.
+Il summary deve stare sempre in massimo 2 righe, senza prefazioni o spiegazioni meta.
 
 Testo:"""
 
@@ -68,6 +70,62 @@ _SYSTEM_PROMPTS = {
 def _strip_markdown(text: str) -> str:
     """Rimuove i backtick markdown (```json ... ```) dalla risposta di Claude."""
     return re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.MULTILINE).strip()
+
+
+def _compact_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _normalize_tags(tags: list[str] | None, source_text: str) -> list[str]:
+    seen: set[str] = set()
+    normalized: list[str] = []
+
+    def _push(tag: str) -> None:
+        cleaned = re.sub(r"[^0-9A-Za-zÀ-ÿ]+", "-", str(tag).lower()).strip("-")
+        if (
+            not cleaned
+            or cleaned in {"narratore", "conversazione", "dialogo"}
+            or cleaned in seen
+        ):
+            return
+        seen.add(cleaned)
+        normalized.append(cleaned)
+
+    for tag in tags or []:
+        _push(tag)
+
+    if not normalized:
+        for word in re.findall(r"[0-9A-Za-zÀ-ÿ']+", source_text.lower()):
+            if len(word) >= 3:
+                _push(word)
+            if len(normalized) == 3:
+                break
+
+    return normalized[:3]
+
+
+def _default_entities() -> dict:
+    return {"events": [], "people": [], "emotions": [], "topics": []}
+
+
+def _normalize_summary(source_text: str, summary: str) -> str:
+    source = _compact_text(source_text)
+    candidate = _compact_text(summary)
+    if len(source.split()) <= 4 or len(source) <= 40:
+        return source
+
+    blocked_phrases = (
+        "troppo breve",
+        "too short",
+        "nessun riassunto significativo",
+        "non è possibile estrarre",
+    )
+    if not candidate or any(phrase in candidate.lower() for phrase in blocked_phrases):
+        return source[:220].strip()
+
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", candidate) if part.strip()]
+    compact = " ".join(sentences[:2]).strip()
+    return compact[:220].strip() or source[:220].strip()
 
 
 def _require_anthropic_api_key() -> str:
@@ -139,6 +197,10 @@ async def stream_response(
 
 
 async def summarize_and_extract(text: str) -> tuple[str, list[str], dict]:
+    compact_text = _compact_text(text)
+    if len(compact_text.split()) <= 4 or len(compact_text) <= 40:
+        return compact_text, _normalize_tags([], compact_text), _default_entities()
+
     response = await client.messages.create(
         model=HAIKU_MODEL,
         max_tokens=512,
@@ -148,6 +210,10 @@ async def summarize_and_extract(text: str) -> tuple[str, list[str], dict]:
     raw = _strip_markdown(response.content[0].text)
     try:
         data = json.loads(raw)
-        return data["summary"], data.get("tags", []), data["entities"]
+        return (
+            _normalize_summary(compact_text, data.get("summary", "")),
+            _normalize_tags(data.get("tags", []), compact_text),
+            data.get("entities") or _default_entities(),
+        )
     except (json.JSONDecodeError, KeyError) as e:
         raise ValueError(f"Memory extraction fallita: {raw}") from e
