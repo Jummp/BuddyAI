@@ -1,11 +1,13 @@
 import asyncio
 import datetime
-from fastapi import APIRouter, HTTPException
+import base64
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from backend.services.supabase import (
     save_push_token, log_training_complete, get_training_log_today,
     get_block_exercises, get_video_link, supabase, create_training_exercise,
     update_training_exercise, delete_training_exercise, save_video_link,
+    save_training_document,
 )
 
 router = APIRouter()
@@ -152,3 +154,36 @@ async def delete_training_exercise_endpoint(exercise_id: str):
 async def save_training_video_link(body: VideoLinkRequest):
     await save_video_link(body.exercise_name, body.url, body.title, "mobile_app")
     return {"saved": True}
+
+
+@router.post("/training/documents")
+async def save_training_document_endpoint(
+    block: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """Salva documento PDF o CSV per un blocco training (A, B o C)."""
+    block = block.strip().upper()
+    if block not in ("A", "B", "C"):
+        raise HTTPException(status_code=400, detail="Blocco deve essere A, B o C")
+    allowed = ("application/pdf", "text/csv", "application/vnd.ms-excel", "text/plain")
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Solo PDF e CSV sono supportati")
+    file_bytes = await file.read()
+    await save_training_document(block, file.filename or "document", file.content_type, file_bytes)
+    return {"saved": True}
+
+
+@router.get("/training/documents/{block}")
+async def get_training_documents(block: str):
+    """Restituisce i documenti caricati per un blocco (A, B, C)."""
+    b = block.strip().upper()
+    if b not in ("A", "B", "C"):
+        raise HTTPException(status_code=400, detail="Blocco deve essere A, B o C")
+    result = await asyncio.to_thread(
+        lambda: supabase.table("training_documents")
+            .select("id, block, filename, file_type, created_at")
+            .eq("block", b)
+            .order("created_at", desc=True)
+            .execute()
+    )
+    return result.data or []

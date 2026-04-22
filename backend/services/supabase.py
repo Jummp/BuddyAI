@@ -539,3 +539,16 @@ async def get_weekly_habit_logs(week_start: str) -> list[dict]:
             .execute()
     )
     return result.data
+
+
+async def save_training_document(block: str, filename: str, file_type: str, file_bytes: bytes) -> None:
+    import base64
+    b64_data = base64.standard_b64encode(file_bytes).decode()
+    await asyncio.to_thread(
+        lambda: supabase.table("training_documents").insert({
+            "block": block,
+            "filename": filename,
+            "file_type": file_type,
+            "file_data": b64_data,
+        }).execute()
+    )

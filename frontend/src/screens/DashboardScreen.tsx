@@ -34,6 +34,29 @@ function startOfWeek(date: Date): Date {
   return d;
 }
 
+const DAILY_QUOTES = [
+  "Il corpo ottiene ciò a cui la mente crede.",
+  "Ogni rep è un voto per la persona che vuoi diventare.",
+  "La disciplina batte la motivazione nel lungo periodo.",
+  "Piccoli progressi ogni giorno portano a grandi risultati.",
+  "Non fermarti quando sei stanco. Fermati quando hai finito.",
+  "La forza non viene dal vincere. Viene dalla lotta.",
+  "Il tuo unico limite sei tu.",
+  "Ogni giorno è una nuova opportunità per migliorare.",
+  "La consistenza è il segreto dei campioni.",
+  "Allenati come se fosse sempre l'ultimo.",
+  "Il dolore di oggi è la forza di domani.",
+  "Chi vuole trovare mille strade, chi non vuole trovare mille scuse.",
+  "Non fare tracking della perfezione, fai tracking della progressione.",
+  "Il corpo si adatta a ciò che gli chiedi.",
+  "Un'ora di allenamento è il 4% della tua giornata.",
+];
+
+function getDailyQuote(): string {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
+}
+
 type AnalysisPeriod = "week" | "2weeks" | "month" | "2months";
 
 const PERIOD_LABELS: Record<AnalysisPeriod, string> = {
@@ -97,19 +120,24 @@ function StatTile({
   value,
   accentColor,
   progress,
+  icon,
 }: {
   eyebrow: string;
   title: string;
   value: string;
   accentColor: string;
   progress: number;
+  icon?: string;
 }) {
   return (
     <SurfaceCard style={{ flex: 1, backgroundColor: Colors.surface3 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 14 }}>
-        <Text style={{ color: Colors.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" }}>
-          {eyebrow}
-        </Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {icon ? <MaterialIcons name={icon as any} size={16} color={accentColor} /> : null}
+          <Text style={{ color: Colors.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" }}>
+            {eyebrow}
+          </Text>
+        </View>
         <Text style={{ color: accentColor, fontSize: 12, fontFamily: Fonts.monoMedium }}>{value}</Text>
       </View>
       <Text style={{ color: Colors.textPrimary, fontSize: 22, fontFamily: Fonts.headlineBold, marginBottom: 18 }}>
@@ -283,8 +311,8 @@ export default function DashboardScreen() {
           Good morning,{"\n"}
           <Text style={{ color: Colors.primaryDark, fontFamily: Fonts.headlineBold }}>Jump.</Text>
         </Text>
-        <Text style={{ color: Colors.textSecondary, fontSize: 17, lineHeight: 25, marginTop: 12, maxWidth: 420, fontFamily: Fonts.bodyRegular }}>
-          Hai allenamento, log nutrizione e consistenza habits sotto controllo. Usa il pannello qui sotto per entrare in azione.
+        <Text style={{ color: Colors.textSecondary, fontSize: 17, lineHeight: 25, marginTop: 12, maxWidth: 420, fontFamily: Fonts.bodyRegular, fontStyle: "italic" }}>
+          "{getDailyQuote()}"
         </Text>
       </View>
 
@@ -369,12 +397,12 @@ export default function DashboardScreen() {
               <Text style={{ color: Colors.textMuted, fontSize: 12, fontFamily: Fonts.monoRegular }}>08:00 — 09:30</Text>
             </View>
             <Text style={{ color: Colors.textPrimary, fontSize: 34, lineHeight: 36, fontFamily: Fonts.headlineBold, maxWidth: "82%", marginBottom: 12 }}>
-              {trainingCompleted ? "Sessione completata" : "Neural Strength Induction"}
+              {trainingCompleted ? "Sessione chiusa. 🔥" : "Ora è il momento."}
             </Text>
-            <Text style={{ color: Colors.textSecondary, fontSize: 16, lineHeight: 24, maxWidth: "84%", marginBottom: 22, fontFamily: Fonts.bodyRegular }}>
+            <Text style={{ color: Colors.textSecondary, fontSize: 16, lineHeight: 24, maxWidth: "84%", marginBottom: 22, fontFamily: Fonts.bodyRegular, fontStyle: "italic" }}>
               {trainingCompleted
-                ? "Hai già chiuso il blocco selezionato. Puoi rientrare per rivedere gli esercizi o modificare il piano."
-                : "Focusing on posterior chain, video cues e correzioni manuali. Apri la sessione e lavora sul blocco attivo."}
+                ? `"${getDailyQuote()}"`
+                : "Ogni allenamento che non salti ti avvicina alla versione migliore di te. Apri il blocco e inizia."}
             </Text>
             <View
               style={{
@@ -401,11 +429,16 @@ export default function DashboardScreen() {
         </Pressable>
 
         <SurfaceCard>
-          <View style={{ marginBottom: 14 }}>
-            <Text style={{ color: Colors.textPrimary, fontSize: 18, fontFamily: Fonts.headlineBold }}>Active Habits</Text>
-            <Text style={{ color: Colors.textSecondary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase", marginTop: 2 }}>
-              Progress & Tracking
-            </Text>
+          <View style={{ marginBottom: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={{ backgroundColor: "rgba(161,255,194,0.12)", borderRadius: 10, padding: 8 }}>
+              <MaterialIcons name="track-changes" size={20} color={Colors.primary} />
+            </View>
+            <View>
+              <Text style={{ color: Colors.textPrimary, fontSize: 18, fontFamily: Fonts.headlineBold }}>Active Habits</Text>
+              <Text style={{ color: Colors.textSecondary, fontSize: 10, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase", marginTop: 2 }}>
+                Progress & Tracking
+              </Text>
+            </View>
           </View>
           {habits.length === 0 ? (
             <Text style={{ color: Colors.textMuted, fontSize: 14, fontFamily: Fonts.bodyRegular, textAlign: "center", paddingVertical: 12 }}>
@@ -416,7 +449,7 @@ export default function DashboardScreen() {
               {habits.map((habit) => {
                 const progress = habit.target > 0 ? habit.weekly_total / habit.target : 0;
                 return (
-                  <Pressable key={habit.id} onPress={() => navigation.navigate("HabitDetail", { id: habit.id })}>
+                  <Pressable key={habit.id} onPress={() => navigation.navigate("HabitDetail", { habitId: habit.id })}>
                     <View style={{ backgroundColor: Colors.surface3, borderRadius: 12, padding: 12 }}>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                         <View style={{ flex: 1 }}>
@@ -445,6 +478,7 @@ export default function DashboardScreen() {
         <Pressable onPress={() => navigation.navigate("Nutrition")}>
           <StatTile
             eyebrow="Nutrition"
+            icon="restaurant"
             title={nutritionToday ? `${nutritionToday.kcal} kcal` : nutritionStats ? `${nutritionStats.avgKcal} kcal` : "No logs"}
             value={nutritionToday ? `${nutritionToday.prot}g prot` : nutritionStats ? `${nutritionStats.daysLogged}/${nutritionStats.totalDays} d` : "--"}
             accentColor={Colors.secondary}

@@ -16,6 +16,7 @@ from backend.api.nutrition import router as nutrition_router
 from backend.api.memories import router as memories_router
 from backend.api.settings import router as settings_router
 from backend.api.tokens import router as tokens_router
+from backend.api.triggers import router as triggers_router
 
 
 @asynccontextmanager
@@ -43,6 +44,7 @@ app.include_router(nutrition_router)
 app.include_router(memories_router)
 app.include_router(settings_router)
 app.include_router(tokens_router)
+app.include_router(triggers_router)
 
 _MOBILE_RESPONSE_CACHE: dict[str, tuple[float, dict]] = {}
 
@@ -194,6 +196,64 @@ async def chat_upload(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Access-Control-Allow-Origin": "*"},
     )
+
+
+@app.post("/chat/fridge-scan")
+async def chat_fridge_scan(file: UploadFile = File(...)):
+    """Scansiona un'immagine (scontrino/foto cibo) ed estrae ingredienti nel frigo."""
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="Solo immagini supportate")
+
+    file_bytes = await file.read()
+    mime = file.content_type or "image/jpeg"
+    b64 = base64.standard_b64encode(file_bytes).decode()
+
+    from backend.services.claude import stream_response, SONNET_MODEL
+    from backend.services.supabase import supabase
+    import asyncio as _asyncio
+
+    messages = [{
+        "role": "user",
+        "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}},
+            {"type": "text", "text": (
+                "Analizza questa immagine (scontrino, foto di alimenti o lista della spesa). "
+                "Estrai tutti gli ingredienti/prodotti alimentari. "
+                "Rispondi SOLO con JSON valido nel formato: "
+                '[{"name": "string", "quantity": number, "unit": "string"}]. '
+                "Usa unità standard: g, kg, ml, l, pz. "
+                "Se non riesci a determinare la quantità, usa 1 pz."
+            )},
+        ],
+    }]
+
+    full_response = ""
+    async for token in stream_response(messages, SONNET_MODEL, "neutral"):
+        full_response += token
+
+    # parse JSON from response
+    import re as _re
+    match = _re.search(r'\[.*\]', full_response, _re.DOTALL)
+    if not match:
+        raise HTTPException(status_code=422, detail="Impossibile estrarre ingredienti dall'immagine")
+
+    items = json.loads(match.group())
+    added = []
+    for item in items:
+        name = str(item.get("name", "")).strip()
+        quantity = float(item.get("quantity", 1))
+        unit = str(item.get("unit", "pz")).strip()
+        if not name:
+            continue
+        await _asyncio.to_thread(
+            lambda n=name, q=quantity, u=unit: supabase.table("fridge_items").upsert(
+                {"name": n, "quantity": q, "unit": u},
+                on_conflict="name"
+            ).execute()
+        )
+        added.append({"name": name, "quantity": quantity, "unit": unit})
+
+    return {"added": added, "count": len(added)}
 
 
 @app.post("/voice/transcribe")

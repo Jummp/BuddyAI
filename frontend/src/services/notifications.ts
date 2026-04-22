@@ -22,7 +22,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
   if (finalStatus !== "granted") return null;
 
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId: "bf939622-5bc4-450a-80d0-f43cf013e1bb" })).data;
   await apiPost("/push/token", { token });
   return token;
 }

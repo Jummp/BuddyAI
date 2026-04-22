@@ -337,6 +337,34 @@ export default function ChatScreen() {
     }
   };
 
+  const [scanningFridge, setScanningFridge] = useState(false);
+
+  const scanToFridge = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permesso negato", "Servono i permessi per accedere alla galleria.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      setScanningFridge(true);
+      const formData = new FormData();
+      const ext = asset.uri.split(".").pop() ?? "jpg";
+      formData.append("file", { uri: asset.uri, name: `scan.${ext}`, type: `image/${ext}` } as any);
+      const res = await fetch(`${API_BASE}/chat/fridge-scan`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Scan fallito");
+      const data = await res.json();
+      const names = data.added.map((i: any) => `• ${i.name} (${i.quantity} ${i.unit})`).join("\n");
+      Alert.alert("✓ Aggiunti al Frigo", names || "Nessun ingrediente trovato");
+    } catch (e: any) {
+      Alert.alert("Errore", e.message);
+    } finally {
+      setScanningFridge(false);
+    }
+  };
+
   const pickAttachment = () => {
     if (Platform.OS === "web") {
       const input = document.createElement("input");
@@ -556,8 +584,12 @@ export default function ChatScreen() {
           <Text style={{ color: Colors.textPrimary, fontSize: 13, flex: 1 }} numberOfLines={1}>
             {attachment.name}
           </Text>
-          <Pressable onPress={() => setAttachment(null)} hitSlop={8}>
-            <Text style={{ color: Colors.textSecondary, fontSize: 16 }}>✕</Text>
+          <Pressable
+            onPress={() => setAttachment(null)}
+            hitSlop={12}
+            style={{ backgroundColor: Colors.surface3, borderRadius: 8, padding: 6 }}
+          >
+            <MaterialIcons name="close" size={18} color={Colors.textPrimary} />
           </Pressable>
         </View>
       )}
@@ -606,7 +638,29 @@ export default function ChatScreen() {
             accessibilityLabel="Allega file"
             accessibilityRole="button"
           >
-            <MaterialIcons name="attach-file" size={18} color={Colors.textSecondary} />
+            <MaterialIcons name="attach-file" size={24} color={Colors.primary} />
+          </Pressable>
+
+          <Pressable
+            onPress={scanToFridge}
+            disabled={isStreaming || isRecording || scanningFridge}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: Colors.surface3,
+              borderWidth: 1,
+              borderColor: "rgba(81,65,102,0.2)",
+              opacity: isStreaming || isRecording || scanningFridge ? 0.4 : pressed ? 0.7 : 1,
+            })}
+            accessibilityLabel="Scansiona al frigo"
+            accessibilityRole="button"
+          >
+            {scanningFridge
+              ? <ActivityIndicator size="small" color={Colors.secondary} />
+              : <MaterialIcons name="kitchen" size={22} color={Colors.secondary} />}
           </Pressable>
 
           <TextInput
@@ -640,13 +694,15 @@ export default function ChatScreen() {
               borderRadius: 12,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: isRecording ? Colors.error : "transparent",
+              backgroundColor: isRecording ? Colors.error : Colors.surface3,
+              borderWidth: 1,
+              borderColor: "rgba(81,65,102,0.2)",
               opacity: isStreaming || transcribing ? 0.4 : pressed ? 0.7 : 1,
             })}
             accessibilityLabel={isRecording ? "Ferma registrazione" : "Inizia registrazione"}
             accessibilityRole="button"
           >
-            {transcribing ? <ActivityIndicator size="small" color={Colors.primary} /> : <MaterialIcons name="mic" size={18} color={isRecording ? Colors.background : Colors.textSecondary} />}
+            {transcribing ? <ActivityIndicator size="small" color={Colors.primary} /> : <MaterialIcons name="mic" size={24} color={isRecording ? Colors.background : Colors.primary} />}
           </Pressable>
 
           <Pressable

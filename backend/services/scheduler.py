@@ -1,6 +1,12 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from backend.config import get_settings
 
+_scheduler: AsyncIOScheduler | None = None
+
+
+def get_scheduler() -> AsyncIOScheduler | None:
+    return _scheduler
+
 
 def setup_scheduler() -> AsyncIOScheduler:
     """Configura e restituisce lo scheduler con tutti i job registrati."""
@@ -15,7 +21,9 @@ def setup_scheduler() -> AsyncIOScheduler:
         getattr(settings, "training_reminder_time", "09:00")
     )
 
+    global _scheduler
     scheduler = AsyncIOScheduler()
+    _scheduler = scheduler
     scheduler.add_job(
         morning_checkin.run,
         "cron",

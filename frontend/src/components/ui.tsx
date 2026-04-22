@@ -56,8 +56,11 @@ export function ScreenHeader({
     <View style={{ marginBottom: 18 }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <View style={{ flex: 1 }}>
-          <View
-            style={{
+          <Pressable
+            onPress={onBack ?? undefined}
+            disabled={!onBack}
+            hitSlop={16}
+            style={({ pressed }) => ({
               alignSelf: "flex-start",
               backgroundColor: Colors.surface3,
               borderRadius: 8,
@@ -69,27 +72,28 @@ export function ScreenHeader({
               flexDirection: "row",
               alignItems: "center",
               gap: 8,
-            }}
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
             {onBack ? (
-              <Pressable onPress={onBack} hitSlop={8}>
-                <MaterialIcons name="arrow-back" size={16} color={Colors.primary} />
-              </Pressable>
+              <MaterialIcons name="arrow-back" size={22} color={Colors.primary} />
             ) : (
               <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: Colors.primary }} />
             )}
-            <Text
-              style={{
-                color: Colors.primary,
-                fontSize: 10,
-                fontFamily: Fonts.headlineBold,
-                letterSpacing: 1.5,
-                textTransform: "uppercase",
-              }}
-            >
-              PandorAI Module
-            </Text>
-          </View>
+            {!onBack && (
+              <Text
+                style={{
+                  color: Colors.primary,
+                  fontSize: 10,
+                  fontFamily: Fonts.headlineBold,
+                  letterSpacing: 1.5,
+                  textTransform: "uppercase",
+                }}
+              >
+                PandorAI Module
+              </Text>
+            )}
+          </Pressable>
           <Text style={{ color: Colors.textPrimary, fontSize: 34, lineHeight: 36, fontFamily: Fonts.headlineBold }}>
             {title}
           </Text>

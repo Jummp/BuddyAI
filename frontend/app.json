@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "BuddyAI",
+    "name": "PandorAI",
     "slug": "buddyai",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "com.jump.buddyai",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -35,7 +35,15 @@
     },
     "plugins": [
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#150629",
+          "sounds": []
+        }
+      ]
     ],
     "extra": {
       "eas": {

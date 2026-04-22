@@ -186,7 +186,7 @@ export default function NutritionScreen() {
   const load = async () => {
     try {
       const [logsData, planData] = await Promise.all([
-        apiGet<NutritionLog[]>(`/nutrition/logs?date_from=${today}`),
+        apiGet<NutritionLog[]>(`/nutrition/logs?date_from=${today}&date_to=${today}`),
         apiGet<Plan | null>("/nutrition/plan").catch(() => null),
       ]);
       setLogs(logsData);

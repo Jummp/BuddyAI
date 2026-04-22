@@ -153,3 +153,26 @@ CREATE TABLE IF NOT EXISTS user_settings (
   training_reminder_time TEXT NOT NULL DEFAULT '09:00',
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Log utilizzo token AI (per stats impostazioni)
+CREATE TABLE IF NOT EXISTS token_logs (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  model         TEXT NOT NULL,
+  input_tokens  INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  endpoint      TEXT NOT NULL DEFAULT 'chat',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_logs_created_at ON token_logs(created_at DESC);
+
+-- Documenti training per blocco (PDF, CSV del piano di allenamento)
+CREATE TABLE IF NOT EXISTS training_documents (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  block         TEXT,
+  exercise_name TEXT,
+  filename      TEXT NOT NULL,
+  file_type     TEXT NOT NULL,
+  file_data     TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);

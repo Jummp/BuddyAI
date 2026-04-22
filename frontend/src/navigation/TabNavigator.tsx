@@ -41,27 +41,25 @@ export default function TabNavigator() {
           backgroundColor: Colors.background,
           borderTopColor: Colors.ghostBorder,
           borderTopWidth: 1,
-          height: 78,
-          paddingTop: 10,
-          paddingBottom: 10,
+          height: 64,
+          paddingTop: 0,
+          paddingBottom: 0,
           shadowColor: Colors.primary,
           shadowOpacity: 0.08,
           shadowRadius: 18,
           shadowOffset: { width: 0, height: -4 },
         },
+        tabBarShowLabel: false,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarItemStyle: {
           marginHorizontal: 4,
           borderRadius: 10,
+          justifyContent: "center",
+          alignItems: "center",
         },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontFamily: Fonts.headlineBold,
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-        },
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ color, focused }) => {
+          const size = focused ? 28 : 24;
           if (route.name === "Chat") return <MaterialIcons name="chat-bubble-outline" size={size} color={color} />;
           if (route.name === "Dashboard") return <MaterialIcons name="dashboard" size={size} color={color} />;
           if (route.name === "Journal") return <MaterialIcons name="auto-stories" size={size} color={color} />;
@@ -70,10 +68,10 @@ export default function TabNavigator() {
         tabBarActiveBackgroundColor: Colors.surface,
       })}
     >
-      <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: "Chat" }} />
-      <Tab.Screen name="Dashboard" component={DashboardStack} options={{ tabBarLabel: "Dashboard" }} />
-      <Tab.Screen name="Journal" component={JournalScreen} options={{ tabBarLabel: "Journal" }} />
-      <Tab.Screen name="Impostazioni" component={ImpostazioniScreen} options={{ tabBarLabel: "Impostazioni" }} />
+      <Tab.Screen name="Chat" component={ChatScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardStack} />
+      <Tab.Screen name="Journal" component={JournalScreen} />
+      <Tab.Screen name="Impostazioni" component={ImpostazioniScreen} />
     </Tab.Navigator>
   );
 }

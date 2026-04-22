@@ -9,19 +9,27 @@ import {
   Text,
   TextInput,
   View,
+  Linking,
+  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 import { Colors } from "../constants/colors";
 import { Fonts } from "../constants/typography";
-import { apiDelete, apiGet, apiPatch, apiPost } from "../services/api";
+import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "../services/api";
 import { AccentButton, Eyebrow, FieldLabel, GlassCard, Pill, ScreenHeader, ScreenShell } from "../components/ui";
 
 const BLOCK_KEY = "training_block";
 const BLOCKS = ["A", "B", "C"] as const;
 type Block = typeof BLOCKS[number];
-const WebView = require("react-native-webview").WebView as React.ComponentType<any>;
+
+function decodeHtmlEntities(text: string): string {
+  return text.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
 
 type Exercise = {
   id: string;
@@ -184,6 +192,35 @@ function VideoModal({
   url: string | null;
   onClose: () => void;
 }) {
+  const decodedTitle = decodeHtmlEntities(title || "Exercise video");
+
+  if (Platform.OS === "web") {
+    if (!visible) return null;
+    return (
+      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+        <View style={{ flex: 1, backgroundColor: Colors.background }}>
+          <View style={{ paddingHorizontal: 20, paddingTop: 56, paddingBottom: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Eyebrow text="Video Overlay" tone="tertiary" />
+              <Text style={{ color: Colors.textPrimary, fontSize: 22, fontFamily: Fonts.headlineBold }} numberOfLines={1}>
+                {decodedTitle}
+              </Text>
+            </View>
+            <Pressable onPress={onClose}>
+              <Text style={{ color: Colors.primary, fontSize: 12, fontFamily: Fonts.headlineBold, letterSpacing: 1.2, textTransform: "uppercase" }}>Close</Text>
+            </Pressable>
+          </View>
+          {url ? (
+            <iframe src={url} style={{ flex: 1, border: "none", width: "100%", height: "100%" } as any} allow="autoplay; fullscreen" allowFullScreen />
+          ) : null}
+        </View>
+      </Modal>
+    );
+  }
+
+  // Lazy require — only evaluated on native, never on web
+  const WebViewComponent = require("react-native-webview").WebView as React.ComponentType<any>;
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -191,7 +228,7 @@ function VideoModal({
           <View style={{ flex: 1, marginRight: 12 }}>
             <Eyebrow text="Video Overlay" tone="tertiary" />
             <Text style={{ color: Colors.textPrimary, fontSize: 22, fontFamily: Fonts.headlineBold }} numberOfLines={1}>
-              {title || "Exercise video"}
+              {decodedTitle}
             </Text>
           </View>
           <Pressable onPress={onClose}>
@@ -201,7 +238,7 @@ function VideoModal({
           </Pressable>
         </View>
         {url ? (
-          <WebView
+          <WebViewComponent
             source={{ uri: url }}
             style={{ flex: 1, backgroundColor: Colors.background }}
             javaScriptEnabled
@@ -290,6 +327,31 @@ export default function TrainingDetailScreen() {
   const [draft, setDraft] = useState<ExerciseDraft>(emptyDraft("A"));
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoTitle, setVideoTitle] = useState("");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const uploadBlockDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "text/csv", "application/vnd.ms-excel"],
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      const file = result.assets[0];
+      setUploadingDoc(true);
+      const formData = new FormData();
+      formData.append("block", block);
+      formData.append("file", { uri: file.uri, name: file.name, type: file.mimeType || "application/pdf" } as any);
+      const res = await fetch(`${API_BASE}/training/documents`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload fallito");
+      Alert.alert("✓", `Documento "${file.name}" caricato per Blocco ${block}`);
+    } catch (e: any) {
+      Alert.alert("Errore", e.message);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
 
   const loadTrainingStatus = useCallback(async () => {
     try {
@@ -462,29 +524,26 @@ export default function TrainingDetailScreen() {
     <ScreenShell>
       <ScreenHeader
         title="Training"
-        subtitle="Blocchi, video overlay e modifica manuale restano finalmente dentro la stessa schermata operativa."
         onBack={() => navigation.goBack()}
         right={<Pill label={completed ? "Session Closed" : "Live Session"} active={completed} tone={completed ? "primary" : "tertiary"} />}
       />
 
-      <GlassCard accent style={{ marginBottom: 16, overflow: "hidden" }}>
-        <View style={{ position: "absolute", right: -20, top: -10, opacity: 0.1 }}>
-          <MaterialIcons name="fitness-center" size={160} color={Colors.primary} />
+      <GlassCard accent style={{ marginBottom: 16, overflow: "hidden", padding: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <Eyebrow text={`Block ${block} / Today`} tone="primary" />
+          <MaterialIcons name="fitness-center" size={18} color={Colors.primary} style={{ opacity: 0.5 }} />
         </View>
-        <Eyebrow text={`Block ${block} / Today`} tone="primary" />
-        <Text style={{ color: Colors.textPrimary, fontSize: 34, lineHeight: 36, fontFamily: Fonts.headlineBold, maxWidth: "80%" }}>
-          {completed ? "Session complete.\nReview and tune." : "Posterior chain\nexecution window."}
-        </Text>
-        <Text style={{ color: Colors.textSecondary, fontSize: 15, lineHeight: 24, marginTop: 14, maxWidth: "82%", fontFamily: Fonts.bodyRegular }}>
-          {completed
-            ? "Puoi rientrare sugli esercizi, correggere volumi e rivedere i video senza perdere lo stato di oggi."
-            : "Apri il blocco attivo, modifica manualmente gli esercizi e guarda le preview in overlay senza uscire dall'app."}
-        </Text>
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
           {BLOCKS.map((blockItem) => (
             <Pill key={blockItem} label={`Block ${blockItem}`} active={blockItem === block} onPress={() => onSelectBlock(blockItem)} />
           ))}
           <Pill label="+ Exercise" tone="secondary" onPress={openCreateExercise} />
+          <Pill
+            label={uploadingDoc ? "Uploading..." : "📎 Upload Plan"}
+            tone="tertiary"
+            onPress={uploadingDoc ? undefined : uploadBlockDocument}
+            icon={<MaterialIcons name="upload-file" size={13} color={Colors.tertiary} />}
+          />
         </View>
       </GlassCard>
 
@@ -524,7 +583,12 @@ export default function TrainingDetailScreen() {
             <ExerciseCard exercise={item} onVideo={() => openVideo(item)} onEdit={() => openEditExercise(item)} onDelete={() => deleteExercise(item)} />
           )}
           ListFooterComponent={
-            <View style={{ marginTop: 20 }}>
+            <View style={{ marginTop: 20, gap: 12 }}>
+              <AccentButton
+                label="+ Add Exercise"
+                onPress={openCreateExercise}
+                tone="secondary"
+              />
               <AccentButton
                 label={completing ? "Closing Session..." : completed ? "Session Completed" : "Mark As Completed"}
                 onPress={completeTraining}
