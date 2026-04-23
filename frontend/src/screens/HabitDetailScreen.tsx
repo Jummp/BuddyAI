@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Text, TextInput, View } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
 import { Fonts } from "../constants/typography";
 import { DashboardStackParamList } from "../navigation/types";
 import { useHabitStore } from "../store/habitStore";
-import { AccentButton, FieldLabel, GlassCard, Pill, ScreenHeader, ScreenShell } from "../components/ui";
+import { AccentButton, Eyebrow, FieldLabel, GlassCard, Pill, ScreenHeader, ScreenShell } from "../components/ui";
 
 type RouteProps = RouteProp<DashboardStackParamList, "HabitDetail">;
 
@@ -13,7 +14,7 @@ export default function HabitDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProps>();
   const { habitId } = route.params ?? {};
-  const { habits, createHabit, updateHabit, fetchHabits } = useHabitStore();
+  const { habits, createHabit, updateHabit, fetchHabits, logHabit } = useHabitStore();
   const existing = habits.find((habit) => habit.id === habitId);
 
   const [name, setName] = useState(existing?.name ?? "");
@@ -22,6 +23,8 @@ export default function HabitDetailScreen() {
   const [target, setTarget] = useState(existing?.target?.toString() ?? "");
   const [reminderTime, setReminderTime] = useState(existing?.reminder_time?.slice(0, 5) ?? "");
   const [saving, setSaving] = useState(false);
+  const [logging, setLogging] = useState(false);
+  const [logValue, setLogValue] = useState("1");
 
   const isNew = !habitId;
 
@@ -86,6 +89,64 @@ export default function HabitDetailScreen() {
             onBack={() => navigation.goBack()}
             right={<Pill label={isNew ? "Create Mode" : "Edit Mode"} tone="tertiary" />}
           />
+
+          {!isNew && existing && (
+            <GlassCard accent style={{ marginBottom: 16 }}>
+              <Eyebrow text="Log Today" tone="primary" />
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <Text style={{ color: Colors.textPrimary, fontSize: 34, fontFamily: Fonts.headlineBold }}>
+                  {existing.weekly_total ?? 0}
+                  <Text style={{ color: Colors.textSecondary, fontSize: 16 }}> / {existing.target}{existing.unit} sett</Text>
+                </Text>
+                <Pill
+                  label={habitType === "limit" ? "LIMIT" : "HABIT"}
+                  tone={habitType === "limit" ? "secondary" : "primary"}
+                />
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+                <TextInput
+                  value={logValue}
+                  onChangeText={setLogValue}
+                  keyboardType="numeric"
+                  style={{
+                    flex: 1,
+                    backgroundColor: Colors.surface,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: Colors.ghostBorder,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    color: Colors.textPrimary,
+                    fontSize: 18,
+                    fontFamily: Fonts.headlineBold,
+                    textAlign: "center",
+                  }}
+                />
+                <Pill
+                  label={unit || "unità"}
+                  tone="neutral"
+                />
+                <Pill
+                  label={logging ? "..." : "+ Log"}
+                  tone="primary"
+                  active
+                  onPress={async () => {
+                    const v = parseFloat(logValue);
+                    if (!v || v <= 0) return;
+                    setLogging(true);
+                    try {
+                      await logHabit(existing.id, v);
+                      setLogValue("1");
+                    } catch (e: any) {
+                      Alert.alert("Errore", e.message);
+                    } finally {
+                      setLogging(false);
+                    }
+                  }}
+                />
+              </View>
+            </GlassCard>
+          )}
 
           <GlassCard accent style={{ marginBottom: 16 }}>
             <FieldLabel text="Name" />

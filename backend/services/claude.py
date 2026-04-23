@@ -19,6 +19,7 @@ Intent disponibili (seleziona tutti quelli applicabili):
 - log_task: l'utente menziona qualcosa da fare o un obiettivo
 - coaching_check: l'utente esprime stato emotivo, difficoltà, o deviazioni da abitudini
 - habit_update: l'utente aggiorna un habit (esercizio, lettura, ecc.)
+- free_training_log: l'utente menziona attività fisica libera fatta (flessioni, corsa, yoga, nuoto, camminata, palestra, ciclismo, ecc.) NON legata al blocco programmato
 - training_request: l'utente vuole allenarsi, chiede cosa fare oggi, menziona un blocco specifico, o chiede del suo piano di allenamento
 - fridge_update: l'utente dice cosa ha in frigo, ha comprato ingredienti, aggiunge o rimuove alimenti dalla dispensa
 - meal_suggestion: l'utente chiede cosa mangiare, cosa cucinare, vuole suggerimenti pasto

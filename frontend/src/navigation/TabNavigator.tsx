@@ -1,7 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
 import { Fonts } from "../constants/typography";
 import { TabParamList, DashboardStackParamList } from "./types";
@@ -41,9 +41,9 @@ export default function TabNavigator() {
           backgroundColor: Colors.background,
           borderTopColor: Colors.ghostBorder,
           borderTopWidth: 1,
-          height: 64,
-          paddingTop: 0,
-          paddingBottom: 0,
+          height: 72,
+          paddingTop: 8,
+          paddingBottom: 10,
           shadowColor: Colors.primary,
           shadowOpacity: 0.08,
           shadowRadius: 18,
@@ -51,7 +51,7 @@ export default function TabNavigator() {
         },
         tabBarShowLabel: false,
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarInactiveTintColor: Colors.textSecondary,
         tabBarItemStyle: {
           marginHorizontal: 4,
           borderRadius: 10,
@@ -59,11 +59,11 @@ export default function TabNavigator() {
           alignItems: "center",
         },
         tabBarIcon: ({ color, focused }) => {
-          const size = focused ? 28 : 24;
-          if (route.name === "Chat") return <MaterialIcons name="chat-bubble-outline" size={size} color={color} />;
-          if (route.name === "Dashboard") return <MaterialIcons name="dashboard" size={size} color={color} />;
-          if (route.name === "Journal") return <MaterialIcons name="auto-stories" size={size} color={color} />;
-          return <Ionicons name="settings-outline" size={size} color={color} />;
+          const size = focused ? 30 : 26;
+          if (route.name === "Chat") return <MaterialIcons name="chat" size={size} color={color} />;
+          if (route.name === "Dashboard") return <MaterialIcons name="grid-view" size={size} color={color} />;
+          if (route.name === "Journal") return <MaterialIcons name="book" size={size} color={color} />;
+          return <MaterialIcons name="settings" size={size} color={color} />;
         },
         tabBarActiveBackgroundColor: Colors.surface,
       })}

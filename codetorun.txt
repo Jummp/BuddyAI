@@ -1,0 +1,10 @@
+Terminale 1:
+
+
+cd C:\Users\Jump.Jpc\Documents\Scripts\ClaudeCode\BuddyAI
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+Terminale 2:
+
+
+cd C:\Users\Jump.Jpc\Documents\Scripts\ClaudeCode\BuddyAI\frontend
+npx expo start --lan

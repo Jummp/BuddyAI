@@ -10,9 +10,10 @@ _NUTRIENT_KEYS = [
 _ZERO_NUTRIENTS = {k: 0 for k in _NUTRIENT_KEYS}
 
 _FOOD_EXTRACT_PROMPT = """Estrai SOLO gli alimenti e le quantità menzionati nel testo. Ignora tutto il resto (emozioni, persone, eventi non alimentari).
-Restituisci una stringa compatta tipo "100g pollo, 200g riso, 1 mela" oppure "" se non c'è cibo.
+Se trovi cibo, restituisci SOLO la lista compatta tipo "100g pollo, 200g riso, 1 mela".
+Se NON trovi cibo, restituisci SOLO la stringa vuota:
 Testo: {text}
-Risposta (solo alimenti):"""
+Risposta (solo alimenti, nient'altro):"""
 
 _ESTIMATION_PROMPT = """Stima i nutrienti del seguente pasto. Dieta: {diet_type}. Allergie: {allergies}.
 Restituisci SOLO JSON valido con esattamente questi campi (usa 0 se non stimabile):
@@ -25,15 +26,19 @@ async def extract_food_description(text: str) -> str:
     """Estrae solo gli alimenti da un testo misto (es. conversazione + cibo).
     Restituisce stringa compatta o stringa vuota se nessun cibo trovato.
     """
+    _NO_FOOD_SIGNALS = ("non ci sono", "nessun", "no food", "no aliment", "non trovo", "non ho trovato")
     try:
         response = await client.messages.create(
             model=HAIKU_MODEL,
             max_tokens=128,
             messages=[{"role": "user", "content": _FOOD_EXTRACT_PROMPT.format(text=text)}],
         )
-        return response.content[0].text.strip()
+        result = response.content[0].text.strip()
+        if not result or any(s in result.lower() for s in _NO_FOOD_SIGNALS):
+            return ""
+        return result
     except Exception:
-        return text[:200]
+        return ""
 
 
 async def estimate_nutrients(meal_description: str, diet_type: str, allergies: list[str]) -> dict:

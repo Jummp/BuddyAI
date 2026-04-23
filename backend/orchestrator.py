@@ -48,6 +48,16 @@ async def process(text: str) -> AsyncIterator[str]:
         extra_system = await log_meal(text)
         intent_result = IntentResult(intent=intent_result.intent, tone="nutrition")
 
+    # 4b2. Log free training if mentioned
+    if "free_training_log" in intent_result.intent:
+        import asyncio as _asyncio
+        from backend.services.supabase import supabase as _sb
+        _note = text[:500]
+        _today = datetime.date.today().isoformat()
+        _asyncio.create_task(_asyncio.to_thread(
+            lambda: _sb.table("free_training_logs").insert({"date": _today, "note": _note}).execute()
+        ))
+
     # 4c. Build habit context if requested
     if "habit_update" in intent_result.intent and "training_request" not in intent_result.intent:
         from backend.agents.habit import process_habit  # noqa: PLC0415

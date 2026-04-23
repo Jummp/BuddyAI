@@ -608,7 +608,7 @@ export default function ChatScreen() {
         <View
           style={{
             flexDirection: "row",
-            alignItems: "center",
+            alignItems: "flex-end",
             gap: 8,
             backgroundColor: Colors.overlay,
             borderRadius: 16,
@@ -673,10 +673,13 @@ export default function ChatScreen() {
               backgroundColor: "transparent",
               paddingHorizontal: 8,
               paddingVertical: 8,
+              paddingBottom: 10,
               color: Colors.textPrimary,
               fontSize: 15,
-              maxHeight: 120,
+              minHeight: 40,
+              maxHeight: 140,
               fontFamily: Fonts.bodyRegular,
+              textAlignVertical: "top",
             }}
             returnKeyType="send"
             onSubmitEditing={() => send(input)}

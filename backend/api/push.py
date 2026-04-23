@@ -4,7 +4,7 @@ import base64
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from backend.services.supabase import (
-    save_push_token, log_training_complete, get_training_log_today,
+    save_push_token, log_training_complete,
     get_block_exercises, get_video_link, supabase, create_training_exercise,
     update_training_exercise, delete_training_exercise, save_video_link,
     save_training_document,
@@ -58,8 +58,52 @@ async def complete_training():
 
 @router.get("/training/today")
 async def training_today():
-    completed = await get_training_log_today()
-    return {"completed": completed}
+    today = datetime.date.today().isoformat()
+    status = await _get_training_status_for_date(today)
+    return {"completed": status["completed"]}
+
+
+async def _get_training_status_for_date(date: str):
+    planned_result = await asyncio.to_thread(
+        lambda: supabase.table("training_logs")
+            .select("completed")
+            .eq("date", date)
+            .limit(1)
+            .execute()
+    )
+    try:
+        free_result = await asyncio.to_thread(
+            lambda: supabase.table("free_training_logs")
+                .select("id")
+                .eq("date", date)
+                .limit(1)
+                .execute()
+        )
+        free_logged = bool(free_result.data)
+    except Exception:
+        free_logged = False
+    planned_completed = bool(planned_result.data and planned_result.data[0]["completed"])
+    return {
+        "date": date,
+        "completed": planned_completed or free_logged,
+        "planned_completed": planned_completed,
+        "free_logged": free_logged,
+    }
+
+
+async def _get_free_training_dates(date_from: str, date_to: str):
+    try:
+        result = await asyncio.to_thread(
+            lambda: supabase.table("free_training_logs")
+                .select("date")
+                .gte("date", date_from)
+                .lte("date", date_to)
+                .order("date")
+                .execute()
+        )
+        return result.data or []
+    except Exception:
+        return []
 
 
 @router.get("/training/status")
@@ -67,21 +111,13 @@ async def training_status(date: str = None):
     """Stato allenamento per una data specifica (YYYY-MM-DD). Default: oggi."""
     if date is None:
         date = datetime.date.today().isoformat()
-    result = await asyncio.to_thread(
-        lambda: supabase.table("training_logs")
-            .select("completed")
-            .eq("date", date)
-            .limit(1)
-            .execute()
-    )
-    completed = bool(result.data and result.data[0]["completed"])
-    return {"date": date, "completed": completed}
+    return await _get_training_status_for_date(date)
 
 
 @router.get("/training/logs")
 async def training_logs(date_from: str, date_to: str):
-    """Lista log allenamenti in un range (YYYY-MM-DD). Restituisce [{date, completed}]."""
-    result = await asyncio.to_thread(
+    """Lista log allenamenti in un range, unendo sessioni programmate e libere."""
+    planned_result = await asyncio.to_thread(
         lambda: supabase.table("training_logs")
             .select("date, completed")
             .gte("date", date_from)
@@ -89,7 +125,25 @@ async def training_logs(date_from: str, date_to: str):
             .order("date")
             .execute()
     )
-    return result.data or []
+    free_rows = await _get_free_training_dates(date_from, date_to)
+    by_date: dict[str, dict] = {}
+    for row in planned_result.data or []:
+        day = str(row["date"])
+        by_date[day] = {
+            "date": day,
+            "completed": bool(row.get("completed")),
+            "planned_completed": bool(row.get("completed")),
+            "free_count": 0,
+        }
+    for row in free_rows:
+        day = str(row["date"])
+        current = by_date.setdefault(
+            day,
+            {"date": day, "completed": False, "planned_completed": False, "free_count": 0},
+        )
+        current["free_count"] += 1
+        current["completed"] = True
+    return [by_date[day] for day in sorted(by_date)]
 
 
 @router.get("/training/block/{block}")
@@ -154,6 +208,43 @@ async def delete_training_exercise_endpoint(exercise_id: str):
 async def save_training_video_link(body: VideoLinkRequest):
     await save_video_link(body.exercise_name, body.url, body.title, "mobile_app")
     return {"saved": True}
+
+
+class FreeTrainingLogRequest(BaseModel):
+    note: str
+    date: str | None = None
+
+
+@router.post("/training/free-log")
+async def log_free_training(body: FreeTrainingLogRequest):
+    import asyncio as _asyncio
+    from backend.services.supabase import supabase
+    note = body.note.strip()
+    if not note:
+        raise HTTPException(status_code=400, detail="Nota allenamento obbligatoria")
+    today = body.date or datetime.date.today().isoformat()
+    await _asyncio.to_thread(
+        lambda: supabase.table("free_training_logs")
+            .insert({"date": today, "note": note})
+            .execute()
+    )
+    return {"logged": True, "date": today}
+
+
+@router.get("/training/free-logs")
+async def get_free_training_logs(limit: int = 8):
+    safe_limit = max(1, min(limit, 50))
+    try:
+        result = await asyncio.to_thread(
+            lambda: supabase.table("free_training_logs")
+                .select("id, date, note, created_at")
+                .order("created_at", desc=True)
+                .limit(safe_limit)
+                .execute()
+        )
+        return result.data or []
+    except Exception:
+        return []
 
 
 @router.post("/training/documents")

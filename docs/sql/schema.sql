@@ -138,6 +138,16 @@ CREATE TABLE IF NOT EXISTS training_logs (
 
 CREATE INDEX IF NOT EXISTS idx_training_logs_date ON training_logs(date DESC);
 
+-- Log allenamenti liberi rilevati dalla chat o inseriti manualmente
+CREATE TABLE IF NOT EXISTS free_training_logs (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date       DATE NOT NULL DEFAULT CURRENT_DATE,
+  note       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_free_training_logs_date ON free_training_logs(date DESC);
+
 -- Aggiunta reminder_time a habit_definitions
 ALTER TABLE habit_definitions
   ADD COLUMN IF NOT EXISTS reminder_time TIME DEFAULT NULL;

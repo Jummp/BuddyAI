@@ -19,6 +19,7 @@ type HabitStore = {
   createHabit: (fields: Pick<Habit, "name" | "habit_type" | "unit" | "target">) => Promise<Habit>;
   updateHabit: (id: string, fields: Partial<Habit>) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
+  logHabit: (id: string, value: number) => Promise<Habit>;
 };
 
 export const useHabitStore = create<HabitStore>((set) => ({
@@ -66,6 +67,20 @@ export const useHabitStore = create<HabitStore>((set) => ({
     try {
       await apiDelete(`/habits/${id}`);
       set((s) => ({ habits: s.habits.filter((h) => h.id !== id), error: null }));
+    } catch (e: any) {
+      set({ error: e.message });
+      throw e;
+    }
+  },
+
+  logHabit: async (id, value) => {
+    try {
+      const updated = await apiPost<Habit>(`/habits/${id}/log`, { value });
+      set((s) => ({
+        habits: s.habits.map((h) => (h.id === id ? { ...h, weekly_total: updated.weekly_total } : h)),
+        error: null,
+      }));
+      return updated;
     } catch (e: any) {
       set({ error: e.message });
       throw e;

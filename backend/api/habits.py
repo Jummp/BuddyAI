@@ -7,6 +7,7 @@ from backend.services.supabase import (
     update_habit_definition,
     delete_habit_definition,
     get_weekly_habit_logs,
+    save_habit_log,
 )
 
 router = APIRouter(prefix="/habits", tags=["habits"])
@@ -67,3 +68,22 @@ async def update_habit(habit_id: str, request: HabitUpdateRequest):
 @router.delete("/{habit_id}", status_code=204)
 async def delete_habit(habit_id: str):
     await delete_habit_definition(habit_id)
+
+
+class HabitLogRequest(BaseModel):
+    value: float
+    date: str | None = None
+
+
+@router.post("/{habit_id}/log")
+async def log_habit(habit_id: str, request: HabitLogRequest):
+    today = request.date or datetime.date.today().isoformat()
+    await save_habit_log(habit_id, today, request.value, "manual")
+    week_start = (datetime.date.today() - datetime.timedelta(days=datetime.date.today().weekday())).isoformat()
+    logs = await get_weekly_habit_logs(week_start)
+    definitions = await get_habit_definitions()
+    hd = next((d for d in definitions if d["id"] == habit_id), None)
+    if not hd:
+        raise HTTPException(status_code=404, detail="Habit non trovata")
+    weekly_total = sum(l["value"] for l in logs if l.get("habit_definitions", {}).get("name") == hd["name"])
+    return {**hd, "weekly_total": weekly_total}

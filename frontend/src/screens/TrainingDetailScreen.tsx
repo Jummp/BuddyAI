@@ -43,6 +43,13 @@ type Exercise = {
   video: { url: string; title: string } | null;
 };
 
+type FreeTrainingLog = {
+  id: string;
+  date: string;
+  note: string;
+  created_at: string;
+};
+
 type ExerciseDraft = {
   block: Block;
   exercise_name: string;
@@ -63,6 +70,12 @@ function toInAppUrl(url: string): string {
 
 function emptyDraft(block: Block): ExerciseDraft {
   return { block, exercise_name: "", drill_id: "", sets: "", reps: "", rest: "", month_focus: "", video_url: "", video_title: "" };
+}
+
+function formatLogDate(date: string): string {
+  const [year, month, day] = date.split("-");
+  if (!year || !month || !day) return date;
+  return `${day}/${month}`;
 }
 
 function EditorModal({
@@ -193,6 +206,7 @@ function VideoModal({
   onClose: () => void;
 }) {
   const decodedTitle = decodeHtmlEntities(title || "Exercise video");
+  const [webViewError, setWebViewError] = useState(false);
 
   if (Platform.OS === "web") {
     if (!visible) return null;
@@ -221,6 +235,8 @@ function VideoModal({
   // Lazy require — only evaluated on native, never on web
   const WebViewComponent = require("react-native-webview").WebView as React.ComponentType<any>;
 
+  const originalUrl = url?.replace("youtube-nocookie.com/embed/", "youtube.com/watch?v=").replace(/\?.*/, "") ?? null;
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -237,18 +253,32 @@ function VideoModal({
             </Text>
           </Pressable>
         </View>
-        {url ? (
+        {url && !webViewError ? (
           <WebViewComponent
             source={{ uri: url }}
-            style={{ flex: 1, backgroundColor: Colors.background }}
+            style={{ flex: 1, backgroundColor: "#000" }}
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback
+            allowsFullscreenVideo
             mediaPlaybackRequiresUserAction={false}
+            userAgent="Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            onError={() => { setWebViewError(true); if (originalUrl) Linking.openURL(originalUrl); }}
+            onHttpError={(e: any) => { if (e.nativeEvent?.statusCode >= 400) { setWebViewError(true); if (originalUrl) Linking.openURL(originalUrl); } }}
           />
         ) : (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color: Colors.textSecondary, fontFamily: Fonts.bodyRegular }}>Video non disponibile.</Text>
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <MaterialIcons name="play-circle-outline" size={64} color={Colors.textMuted} />
+            <Text style={{ color: Colors.textSecondary, fontFamily: Fonts.bodyRegular }}>
+              {webViewError ? "Embed non disponibile per questo video." : "Video non disponibile."}
+            </Text>
+            {webViewError && originalUrl && (
+              <Pressable onPress={() => Linking.openURL(originalUrl)}>
+                <Text style={{ color: Colors.tertiary, fontFamily: Fonts.headlineBold, fontSize: 13, letterSpacing: 1.1, textTransform: "uppercase" }}>
+                  Apri su YouTube →
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
       </View>
@@ -328,6 +358,10 @@ export default function TrainingDetailScreen() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [freeLogNote, setFreeLogNote] = useState("");
+  const [savingFreeLog, setSavingFreeLog] = useState(false);
+  const [freeLogs, setFreeLogs] = useState<FreeTrainingLog[]>([]);
+  const [loadingFreeLogs, setLoadingFreeLogs] = useState(false);
 
   const uploadBlockDocument = async () => {
     try {
@@ -374,21 +408,34 @@ export default function TrainingDetailScreen() {
     }
   }, []);
 
+  const loadFreeLogs = useCallback(async () => {
+    setLoadingFreeLogs(true);
+    try {
+      const data = await apiGet<FreeTrainingLog[]>("/training/free-logs?limit=8");
+      setFreeLogs(Array.isArray(data) ? data : []);
+    } catch {
+      setFreeLogs([]);
+    } finally {
+      setLoadingFreeLogs(false);
+    }
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       const saved = await AsyncStorage.getItem(BLOCK_KEY);
       const nextBlock = (saved as Block) ?? "A";
       setBlock(nextBlock);
-      await Promise.all([loadTrainingStatus(), loadBlock(nextBlock)]);
+      await Promise.all([loadTrainingStatus(), loadBlock(nextBlock), loadFreeLogs()]);
     };
     init();
-  }, [loadBlock, loadTrainingStatus]);
+  }, [loadBlock, loadFreeLogs, loadTrainingStatus]);
 
   useFocusEffect(
     React.useCallback(() => {
       loadTrainingStatus();
       loadBlock(block);
-    }, [block, loadBlock, loadTrainingStatus])
+      loadFreeLogs();
+    }, [block, loadBlock, loadFreeLogs, loadTrainingStatus])
   );
 
   const onSelectBlock = async (nextBlock: Block) => {
@@ -399,7 +446,7 @@ export default function TrainingDetailScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadTrainingStatus(), loadBlock(block)]);
+    await Promise.all([loadTrainingStatus(), loadBlock(block), loadFreeLogs()]);
     setRefreshing(false);
   };
 
@@ -520,6 +567,93 @@ export default function TrainingDetailScreen() {
     ]);
   };
 
+  const renderFreeTrainingSection = () => (
+    <GlassCard style={{ marginTop: 8 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <View>
+          <Eyebrow text="Free Training Log" tone="secondary" />
+          <Text style={{ color: Colors.textPrimary, fontSize: 18, fontFamily: Fonts.headlineBold }}>
+            Allenamenti liberi
+          </Text>
+        </View>
+        <Pill label={`${freeLogs.length} recenti`} tone="neutral" />
+      </View>
+      <TextInput
+        value={freeLogNote}
+        onChangeText={setFreeLogNote}
+        placeholder="50 flessioni, 3km corsa, yoga 20min..."
+        placeholderTextColor={Colors.textMuted}
+        multiline
+        style={{
+          backgroundColor: Colors.surface,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: Colors.ghostBorder,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          color: Colors.textPrimary,
+          fontSize: 14,
+          fontFamily: Fonts.bodyRegular,
+          minHeight: 72,
+          textAlignVertical: "top",
+          marginBottom: 10,
+        }}
+      />
+      <AccentButton
+        tone="secondary"
+        label={savingFreeLog ? "Salvando..." : "Log Free Session"}
+        disabled={!freeLogNote.trim() || savingFreeLog}
+        onPress={async () => {
+          setSavingFreeLog(true);
+          try {
+            await apiPost("/training/free-log", { note: freeLogNote.trim(), date: new Date().toISOString().split("T")[0] });
+            setFreeLogNote("");
+            await Promise.all([loadFreeLogs(), loadTrainingStatus()]);
+            Alert.alert("✓", "Sessione libera loggata.");
+          } catch (e: any) {
+            Alert.alert("Errore", e.message);
+          } finally {
+            setSavingFreeLog(false);
+          }
+        }}
+      />
+      <View style={{ marginTop: 16, gap: 8 }}>
+        {loadingFreeLogs ? (
+          <ActivityIndicator color={Colors.primary} />
+        ) : freeLogs.length === 0 ? (
+          <Text style={{ color: Colors.textSecondary, fontSize: 14, lineHeight: 22, fontFamily: Fonts.bodyRegular }}>
+            Ancora nessun allenamento libero salvato. Quando lo scrivi in chat o qui, comparirà in questa lista.
+          </Text>
+        ) : (
+          freeLogs.map((log) => (
+            <View
+              key={log.id}
+              style={{
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: Colors.ghostBorder,
+                backgroundColor: Colors.surface,
+                padding: 12,
+                flexDirection: "row",
+                gap: 12,
+              }}
+            >
+              <View style={{ alignItems: "center", minWidth: 44 }}>
+                <MaterialIcons name="directions-run" size={18} color={Colors.primary} />
+                <Text style={{ color: Colors.textMuted, fontSize: 11, marginTop: 4, fontFamily: Fonts.monoRegular }}>
+                  {formatLogDate(log.date)}
+                </Text>
+              </View>
+              <Text style={{ flex: 1, color: Colors.textSecondary, fontSize: 14, lineHeight: 21, fontFamily: Fonts.bodyRegular }}>
+                {log.note}
+              </Text>
+            </View>
+          ))
+        )}
+      </View>
+    </GlassCard>
+  );
+
   return (
     <ScreenShell>
       <ScreenHeader
@@ -571,6 +705,7 @@ export default function TrainingDetailScreen() {
             </Text>
             <AccentButton label="Create First Exercise" onPress={openCreateExercise} />
           </GlassCard>
+          {renderFreeTrainingSection()}
         </View>
       ) : (
         <FlatList
@@ -594,6 +729,7 @@ export default function TrainingDetailScreen() {
                 onPress={completeTraining}
                 disabled={completed || completing}
               />
+              {renderFreeTrainingSection()}
             </View>
           }
         />
