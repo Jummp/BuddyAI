@@ -344,6 +344,25 @@ async def get_training_log_today() -> bool:
     return bool(result.data and result.data[0]["completed"])
 
 
+async def get_training_completed_today_including_free() -> bool:
+    """True se oggi esiste un training programmato completato o un free training log."""
+    today = datetime.date.today().isoformat()
+    planned_completed = await get_training_log_today()
+    if planned_completed:
+        return True
+    try:
+        result = await asyncio.to_thread(
+            lambda: supabase.table("free_training_logs")
+                .select("id")
+                .eq("date", today)
+                .limit(1)
+                .execute()
+        )
+        return bool(result.data)
+    except Exception:
+        return False
+
+
 async def get_fridge_items() -> list[dict]:
     """Restituisce tutti gli ingredienti nel frigo."""
     result = await asyncio.to_thread(

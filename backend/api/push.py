@@ -49,6 +49,16 @@ async def register_push_token(request: PushTokenRequest):
     return {"registered": True}
 
 
+@router.post("/push/test")
+async def test_push_notification():
+    from backend.services.push import send_push
+    return await send_push(
+        title="PandorAI — test",
+        body="Notifiche attive. Sistema raggiungibile.",
+        data={"type": "test"},
+    )
+
+
 @router.post("/training/complete")
 async def complete_training():
     today = datetime.date.today().isoformat()

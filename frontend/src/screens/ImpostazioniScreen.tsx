@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Colors } from "../constants/colors";
 import { Fonts } from "../constants/typography";
-import { apiGet, apiPut } from "../services/api";
+import { apiGet, apiPost, apiPut } from "../services/api";
+import { getPushPermissionStatus, registerForPushNotifications } from "../services/notifications";
 import { AccentButton, FieldLabel, GlassCard, Pill, ScreenHeader, ScreenShell } from "../components/ui";
 
 type TokenStats = {
@@ -78,6 +79,8 @@ export default function ImpostazioniScreen() {
   const [tokenPeriod, setTokenPeriod] = useState<TokenPeriod>("today");
   const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
   const [loadingTokens, setLoadingTokens] = useState(false);
+  const [pushStatus, setPushStatus] = useState("unknown");
+  const [testingPush, setTestingPush] = useState(false);
 
   const inputStyle = {
     backgroundColor: Colors.surface,
@@ -128,7 +131,35 @@ export default function ImpostazioniScreen() {
 
     load();
     loadTokenStats("today");
+    getPushPermissionStatus().then(setPushStatus).catch(() => setPushStatus("unknown"));
   }, [loadTokenStats]);
+
+  const enableNotifications = async () => {
+    try {
+      const token = await registerForPushNotifications();
+      const status = await getPushPermissionStatus().catch(() => token ? "granted" : "unknown");
+      setPushStatus(status);
+      Alert.alert(token ? "Notifiche attive" : "Notifiche non abilitate", token ? "Token Expo salvato." : "Permesso non concesso.");
+    } catch (e: any) {
+      Alert.alert("Errore notifiche", e?.message ?? "Impossibile registrare notifiche");
+    }
+  };
+
+  const testNotification = async () => {
+    setTestingPush(true);
+    try {
+      const result = await apiPost<{ sent: boolean; reason?: string; status_code?: number }>("/push/test");
+      if (result.sent) {
+        Alert.alert("Test inviato", "Se il token e i permessi sono validi, riceverai una notifica.");
+      } else {
+        Alert.alert("Test non inviato", result.reason || `Expo status ${result.status_code ?? "n/a"}`);
+      }
+    } catch (e: any) {
+      Alert.alert("Errore test push", e?.message ?? "Impossibile inviare test");
+    } finally {
+      setTestingPush(false);
+    }
+  };
 
   const saveAll = async () => {
     setSaving(true);
@@ -181,6 +212,29 @@ export default function ImpostazioniScreen() {
 
           <FieldLabel text="Training Reminder" />
           <TextInput value={trainingTime} onChangeText={setTrainingTime} style={inputStyle} />
+        </GlassCard>
+
+        <GlassCard style={{ marginBottom: 14 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <View>
+              <FieldLabel text="Push Notifications" />
+              <Text style={{ color: Colors.textPrimary, fontSize: 22, fontFamily: Fonts.headlineBold }}>
+                Stato: {pushStatus}
+              </Text>
+            </View>
+            <Pill label={pushStatus === "granted" ? "Active" : "Check"} active={pushStatus === "granted"} tone={pushStatus === "granted" ? "primary" : "secondary"} />
+          </View>
+          <Text style={{ color: Colors.textSecondary, fontSize: 14, lineHeight: 22, marginBottom: 14, fontFamily: Fonts.bodyRegular }}>
+            Se il telefono non riceve reminder, abilita di nuovo il token e poi manda un test push.
+          </Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <AccentButton label="Enable Token" onPress={enableNotifications} tone="surface" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AccentButton label={testingPush ? "Testing..." : "Test Push"} onPress={testNotification} disabled={testingPush} />
+            </View>
+          </View>
         </GlassCard>
 
         <GlassCard style={{ marginBottom: 14 }}>

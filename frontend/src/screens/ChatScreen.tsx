@@ -20,6 +20,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
 import { Fonts } from "../constants/typography";
 import { useChatStore, Message } from "../store/chatStore";
+import { useAppEventsStore } from "../store/appEventsStore";
 import { API_BASE, apiPost } from "../services/api";
 
 function stripMd(text: string): string {
@@ -184,6 +185,7 @@ export default function ChatScreen() {
     finalizeMessage,
     setStreaming,
   } = useChatStore();
+  const markDataMutation = useAppEventsStore((state) => state.markDataMutation);
   const listRef = useRef<FlatList>(null);
 
   const displayMessages = useMemo<DisplayMessage[]>(() => {
@@ -287,6 +289,7 @@ export default function ChatScreen() {
     } finally {
       finalizeMessage(aiId);
       setStreaming(false);
+      markDataMutation();
     }
     listRef.current?.scrollToEnd({ animated: true });
   };
@@ -338,6 +341,8 @@ export default function ChatScreen() {
   };
 
   const [scanningFridge, setScanningFridge] = useState(false);
+  const composerDense = input.trim().length > 0 || transcribing;
+  const iconButtonSize = composerDense ? 34 : 40;
 
   const scanToFridge = async () => {
     try {
@@ -625,8 +630,9 @@ export default function ChatScreen() {
             onPress={pickAttachment}
             disabled={isStreaming || isRecording}
             style={({ pressed }) => ({
-              width: 40,
-              height: 40,
+              display: composerDense ? "none" : "flex",
+              width: iconButtonSize,
+              height: iconButtonSize,
               borderRadius: 12,
               alignItems: "center",
               justifyContent: "center",
@@ -645,8 +651,9 @@ export default function ChatScreen() {
             onPress={scanToFridge}
             disabled={isStreaming || isRecording || scanningFridge}
             style={({ pressed }) => ({
-              width: 40,
-              height: 40,
+              display: composerDense ? "none" : "flex",
+              width: iconButtonSize,
+              height: iconButtonSize,
               borderRadius: 12,
               alignItems: "center",
               justifyContent: "center",
@@ -675,9 +682,9 @@ export default function ChatScreen() {
               paddingVertical: 8,
               paddingBottom: 10,
               color: Colors.textPrimary,
-              fontSize: 15,
-              minHeight: 40,
-              maxHeight: 140,
+              fontSize: 16,
+              minHeight: composerDense ? 64 : 40,
+              maxHeight: 180,
               fontFamily: Fonts.bodyRegular,
               textAlignVertical: "top",
             }}
@@ -692,8 +699,8 @@ export default function ChatScreen() {
             onPress={toggleRecording}
             disabled={isStreaming || transcribing}
             style={({ pressed }) => ({
-              width: 40,
-              height: 40,
+              width: iconButtonSize,
+              height: iconButtonSize,
               borderRadius: 12,
               alignItems: "center",
               justifyContent: "center",
@@ -712,8 +719,8 @@ export default function ChatScreen() {
             onPress={() => send(input)}
             disabled={isStreaming || (!input.trim() && !attachment) || isRecording}
             style={({ pressed }) => ({
-              minWidth: 76,
-              height: 40,
+              minWidth: composerDense ? 52 : 76,
+              height: iconButtonSize,
               borderRadius: 12,
               alignItems: "center",
               justifyContent: "center",
@@ -736,7 +743,7 @@ export default function ChatScreen() {
                 textTransform: "uppercase",
               }}
             >
-              Send →
+              {composerDense ? "→" : "Send →"}
             </Text>
           </Pressable>
         </View>

@@ -26,3 +26,9 @@ export async function registerForPushNotifications(): Promise<string | null> {
   await apiPost("/push/token", { token });
   return token;
 }
+
+
+export async function getPushPermissionStatus(): Promise<string> {
+  const { status } = await Notifications.getPermissionsAsync();
+  return status;
+}

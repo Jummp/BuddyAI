@@ -22,6 +22,7 @@ class HabitCreateRequest(BaseModel):
 
 class HabitUpdateRequest(BaseModel):
     name: str | None = None
+    habit_type: str | None = None
     unit: str | None = None
     target: float | None = None
     reminder_time: str | None = None  # "HH:MM" or null
@@ -49,6 +50,8 @@ async def list_habits():
 
 @router.post("", status_code=201)
 async def create_habit(request: HabitCreateRequest):
+    if request.habit_type not in ("habit", "limit"):
+        raise HTTPException(status_code=400, detail="habit_type deve essere habit o limit")
     return await save_habit_definition(
         name=request.name,
         habit_type=request.habit_type,
@@ -60,6 +63,8 @@ async def create_habit(request: HabitCreateRequest):
 @router.patch("/{habit_id}")
 async def update_habit(habit_id: str, request: HabitUpdateRequest):
     fields = {k: v for k, v in request.model_dump().items() if v is not None}
+    if fields.get("habit_type") not in (None, "habit", "limit"):
+        raise HTTPException(status_code=400, detail="habit_type deve essere habit o limit")
     if not fields:
         raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
     return await update_habit_definition(habit_id, fields)

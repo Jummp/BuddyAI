@@ -14,6 +14,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
 import { Fonts } from "../constants/typography";
 import { useHabitStore } from "../store/habitStore";
+import { useAppEventsStore } from "../store/appEventsStore";
 import { apiGet } from "../services/api";
 
 function isoDate(date: Date): string {
@@ -154,6 +155,7 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { habits, fetchHabits } = useHabitStore();
+  const lastDataMutationAt = useAppEventsStore((state) => state.lastDataMutationAt);
 
   const todayStr = isoDate(new Date());
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -259,6 +261,10 @@ export default function DashboardScreen() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (lastDataMutationAt > 0) load();
+  }, [lastDataMutationAt, load]);
 
   useFocusEffect(
     useCallback(() => {

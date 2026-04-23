@@ -9,7 +9,6 @@ import {
   Text,
   TextInput,
   View,
-  Linking,
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -62,10 +61,35 @@ type ExerciseDraft = {
   video_title?: string;
 };
 
-function toInAppUrl(url: string): string {
+function getYouTubeId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/\s]+)/);
-  if (m) return `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&playsinline=1&rel=0`;
+  return m?.[1] ?? null;
+}
+
+function toInAppUrl(url: string): string {
+  const videoId = getYouTubeId(url);
+  if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=https%3A%2F%2Fbuddyai.local`;
   return url;
+}
+
+function buildVideoHtml(url: string): string {
+  return `<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+      iframe { width: 100%; height: 100%; border: 0; background: #000; }
+    </style>
+  </head>
+  <body>
+    <iframe
+      src="${url}"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+      allowfullscreen
+    ></iframe>
+  </body>
+</html>`;
 }
 
 function emptyDraft(block: Block): ExerciseDraft {
@@ -199,14 +223,20 @@ function VideoModal({
   title,
   url,
   onClose,
+  onReplace,
 }: {
   visible: boolean;
   title: string;
   url: string | null;
   onClose: () => void;
+  onReplace?: () => void;
 }) {
   const decodedTitle = decodeHtmlEntities(title || "Exercise video");
   const [webViewError, setWebViewError] = useState(false);
+
+  useEffect(() => {
+    setWebViewError(false);
+  }, [url, visible]);
 
   if (Platform.OS === "web") {
     if (!visible) return null;
@@ -235,8 +265,6 @@ function VideoModal({
   // Lazy require — only evaluated on native, never on web
   const WebViewComponent = require("react-native-webview").WebView as React.ComponentType<any>;
 
-  const originalUrl = url?.replace("youtube-nocookie.com/embed/", "youtube.com/watch?v=").replace(/\?.*/, "") ?? null;
-
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -255,7 +283,7 @@ function VideoModal({
         </View>
         {url && !webViewError ? (
           <WebViewComponent
-            source={{ uri: url }}
+            source={{ html: buildVideoHtml(url), baseUrl: "https://www.youtube.com" }}
             style={{ flex: 1, backgroundColor: "#000" }}
             javaScriptEnabled
             domStorageEnabled
@@ -263,19 +291,19 @@ function VideoModal({
             allowsFullscreenVideo
             mediaPlaybackRequiresUserAction={false}
             userAgent="Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-            onError={() => { setWebViewError(true); if (originalUrl) Linking.openURL(originalUrl); }}
-            onHttpError={(e: any) => { if (e.nativeEvent?.statusCode >= 400) { setWebViewError(true); if (originalUrl) Linking.openURL(originalUrl); } }}
+            onError={() => setWebViewError(true)}
+            onHttpError={(e: any) => { if (e.nativeEvent?.statusCode >= 400) setWebViewError(true); }}
           />
         ) : (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 16 }}>
             <MaterialIcons name="play-circle-outline" size={64} color={Colors.textMuted} />
-            <Text style={{ color: Colors.textSecondary, fontFamily: Fonts.bodyRegular }}>
+            <Text style={{ color: Colors.textSecondary, fontFamily: Fonts.bodyRegular, textAlign: "center", paddingHorizontal: 24 }}>
               {webViewError ? "Embed non disponibile per questo video." : "Video non disponibile."}
             </Text>
-            {webViewError && originalUrl && (
-              <Pressable onPress={() => Linking.openURL(originalUrl)}>
+            {webViewError && onReplace && (
+              <Pressable onPress={onReplace}>
                 <Text style={{ color: Colors.tertiary, fontFamily: Fonts.headlineBold, fontSize: 13, letterSpacing: 1.1, textTransform: "uppercase" }}>
-                  Apri su YouTube →
+                  Sostituisci link video →
                 </Text>
               </Pressable>
             )}
@@ -357,6 +385,7 @@ export default function TrainingDetailScreen() {
   const [draft, setDraft] = useState<ExerciseDraft>(emptyDraft("A"));
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoTitle, setVideoTitle] = useState("");
+  const [videoExercise, setVideoExercise] = useState<Exercise | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [freeLogNote, setFreeLogNote] = useState("");
   const [savingFreeLog, setSavingFreeLog] = useState(false);
@@ -545,6 +574,7 @@ export default function TrainingDetailScreen() {
     if (!exercise.video?.url) return;
     setVideoTitle(exercise.video.title || exercise.exercise_name);
     setVideoUrl(toInAppUrl(exercise.video.url));
+    setVideoExercise(exercise);
   };
 
   const completeTraining = () => {
@@ -745,7 +775,21 @@ export default function TrainingDetailScreen() {
         onSave={saveExercise}
       />
 
-      <VideoModal visible={!!videoUrl} title={videoTitle} url={videoUrl} onClose={() => setVideoUrl(null)} />
+      <VideoModal
+        visible={!!videoUrl}
+        title={videoTitle}
+        url={videoUrl}
+        onClose={() => {
+          setVideoUrl(null);
+          setVideoExercise(null);
+        }}
+        onReplace={videoExercise ? () => {
+          const exercise = videoExercise;
+          setVideoUrl(null);
+          setVideoExercise(null);
+          openEditExercise(exercise);
+        } : undefined}
+      />
     </ScreenShell>
   );
 }

@@ -1,6 +1,6 @@
 import asyncio
 from backend.services.push import send_push
-from backend.services.supabase import get_training_log_today
+from backend.services.supabase import get_training_completed_today_including_free
 
 _FIRST_BODY = "Oggi tocca allenarsi! Apri BuddyAI per vedere il tuo blocco."
 _SECOND_BODY = "Non hai ancora fatto l'allenamento. Dai, ce la fai!"
@@ -8,6 +8,8 @@ _SECOND_BODY = "Non hai ancora fatto l'allenamento. Dai, ce la fai!"
 
 async def run() -> None:
     """Invia primo reminder allenamento, poi schedula re-check adattivo."""
+    if await get_training_completed_today_including_free():
+        return
     await send_push(
         title="BuddyAI — Allenamento",
         body=_FIRST_BODY,
@@ -27,7 +29,7 @@ async def _schedule_recheck() -> None:
 
 async def adaptive_recheck() -> None:
     """Invia secondo reminder solo se allenamento non ancora completato."""
-    completed = await get_training_log_today()
+    completed = await get_training_completed_today_including_free()
     if not completed:
         await send_push(
             title="BuddyAI — Allenamento",
